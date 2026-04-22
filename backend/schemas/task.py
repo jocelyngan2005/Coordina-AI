@@ -1,0 +1,43 @@
+"""schemas/task.py"""
+
+from pydantic import BaseModel
+from datetime import datetime
+from typing import Optional
+from models.task import TaskStatus, TaskPriority
+
+
+class TaskCreate(BaseModel):
+    project_id: str
+    title: str
+    description: Optional[str] = None
+    priority: TaskPriority = TaskPriority.MEDIUM
+    assignee_id: Optional[str] = None
+    estimated_hours: int = 0
+    due_date: Optional[datetime] = None
+
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[TaskStatus] = None
+    priority: Optional[TaskPriority] = None
+    assignee_id: Optional[str] = None
+    completion_pct: Optional[int] = None
+    due_date: Optional[datetime] = None
+
+
+class TaskResponse(BaseModel):
+    id: str
+    project_id: str
+    title: str
+    description: Optional[str]
+    status: TaskStatus
+    priority: TaskPriority
+    assignee_id: Optional[str]
+    estimated_hours: int
+    completion_pct: int
+    due_date: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
