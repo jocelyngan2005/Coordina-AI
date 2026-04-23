@@ -1,0 +1,219 @@
+import { useState, type ReactNode } from 'react';
+import { NavLink, useParams, useLocation } from 'react-router-dom';
+
+/* ─── Icons (inline SVGs) ─── */
+const icons = {
+  dashboard: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+      <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+    </svg>
+  ),
+  newProject: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
+    </svg>
+  ),
+  workspace: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  ),
+  agents: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="9" height="9" rx="1" /><rect x="13" y="2" width="9" height="9" rx="1" />
+      <rect x="2" y="13" width="9" height="9" rx="1" /><path d="M17 17h4m-2-2v4" />
+    </svg>
+  ),
+  risk: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  ),
+  submission: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+      <polyline points="14 2 14 8 20 8" /><polyline points="9 15 11 17 15 13" />
+    </svg>
+  ),
+  collapse: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  ),
+  expand: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  ),
+  logo: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6v6l4 2" />
+      <circle cx="12" cy="12" r="2" fill="currentColor" />
+    </svg>
+  ),
+};
+
+interface NavItemProps {
+  to: string;
+  icon: ReactNode;
+  label: string;
+  collapsed: boolean;
+  end?: boolean;
+}
+
+function NavItem({ to, icon, label, collapsed, end }: NavItemProps) {
+  const activeStyle: React.CSSProperties = {
+    background: 'var(--grey-900)',
+    color: 'var(--white)',
+  };
+  const baseStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: collapsed ? '9px 0' : '9px 12px',
+    justifyContent: collapsed ? 'center' : 'flex-start',
+    borderRadius: 'var(--radius-md)',
+    color: 'var(--grey-600)',
+    transition: 'all var(--t-fast)',
+    fontSize: 13,
+    fontWeight: 500,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    width: '100%',
+    cursor: 'pointer',
+    position: 'relative',
+  };
+
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      title={collapsed ? label : undefined}
+      style={({ isActive }) => ({ ...baseStyle, ...(isActive ? activeStyle : {}) })}
+      onMouseEnter={e => {
+        const el = e.currentTarget as HTMLAnchorElement;
+        if (!el.getAttribute('aria-current')) {
+          el.style.background = 'var(--grey-100)';
+          el.style.color = 'var(--grey-900)';
+        }
+      }}
+      onMouseLeave={e => {
+        const el = e.currentTarget as HTMLAnchorElement;
+        if (!el.getAttribute('aria-current')) {
+          el.style.background = '';
+          el.style.color = 'var(--grey-600)';
+        }
+      }}
+    >
+      <span style={{ flexShrink: 0, display: 'flex' }}>{icon}</span>
+      {!collapsed && <span style={{ transition: 'opacity var(--t-base)', opacity: collapsed ? 0 : 1 }}>{label}</span>}
+    </NavLink>
+  );
+}
+
+interface SectionLabelProps { label: string; collapsed: boolean; }
+function SectionLabel({ label, collapsed }: SectionLabelProps) {
+  if (collapsed) return <div style={{ height: 1, background: 'var(--border)', margin: '8px 8px' }} />;
+  return (
+    <div style={{
+      fontSize: 10,
+      fontWeight: 600,
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      color: 'var(--text-3)',
+      padding: '8px 12px 4px',
+    }}>
+      {label}
+    </div>
+  );
+}
+
+export default function Navbar() {
+  const [collapsed, setCollapsed] = useState(false);
+  const { id: projectId } = useParams();
+  const location = useLocation();
+  const isOnProject = location.pathname.startsWith('/projects/') && !location.pathname.endsWith('/new');
+  const pid = projectId || 'proj-001';
+
+  const sidebarStyle: React.CSSProperties = {
+    width: collapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-w)',
+    flexShrink: 0,
+    height: '100vh',
+    borderRight: '1px solid var(--border)',
+    background: 'var(--white)',
+    display: 'flex',
+    flexDirection: 'column',
+    transition: 'width var(--t-base)',
+    overflow: 'hidden',
+    position: 'relative',
+    zIndex: 10,
+  };
+
+  return (
+    <nav style={sidebarStyle}>
+      {/* Logo */}
+      <div style={{
+        height: 'var(--topbar-h)',
+        display: 'flex',
+        alignItems: 'center',
+        padding: collapsed ? '0' : '0 16px',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        borderBottom: '1px solid var(--border)',
+        gap: 8,
+        flexShrink: 0,
+      }}>
+        <span style={{ color: 'var(--grey-900)', display: 'flex' }}>{icons.logo}</span>
+        {!collapsed && (
+          <span style={{ fontWeight: 700, fontSize: 14, letterSpacing: '-0.02em', color: 'var(--grey-900)', whiteSpace: 'nowrap' }}>
+            Coordina <span style={{ fontWeight: 300, color: 'var(--grey-500)' }}>AI</span>
+          </span>
+        )}
+      </div>
+
+      {/* Nav Items */}
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '8px' }}>
+        <SectionLabel label="Main" collapsed={collapsed} />
+        <NavItem to="/" icon={icons.dashboard} label="Dashboard" collapsed={collapsed} end />
+        <NavItem to="/projects/new" icon={icons.newProject} label="New Project" collapsed={collapsed} end />
+
+        {isOnProject && (
+          <>
+            <SectionLabel label="Current Project" collapsed={collapsed} />
+            <NavItem to={`/projects/${pid}`} icon={icons.workspace} label="Workspace" collapsed={collapsed} end />
+            <NavItem to={`/projects/${pid}/agents`} icon={icons.agents} label="Agent Pipeline" collapsed={collapsed} />
+            <NavItem to={`/projects/${pid}/risks`} icon={icons.risk} label="Risk & Alerts" collapsed={collapsed} />
+            <NavItem to={`/projects/${pid}/submission`} icon={icons.submission} label="Submission" collapsed={collapsed} />
+          </>
+        )}
+      </div>
+
+      {/* Collapse Toggle */}
+      <div style={{ borderTop: '1px solid var(--border)', padding: '8px' }}>
+        <button
+          onClick={() => setCollapsed(c => !c)}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: collapsed ? 'center' : 'flex-end',
+            gap: 6,
+            padding: '8px',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--grey-500)',
+            fontSize: 12,
+            transition: 'all var(--t-fast)',
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--grey-100)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = ''; }}
+        >
+          {!collapsed && <span>Collapse</span>}
+          {collapsed ? icons.expand : icons.collapse}
+        </button>
+      </div>
+    </nav>
+  );
+}
