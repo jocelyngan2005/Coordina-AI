@@ -1,0 +1,58 @@
+{
+  "project_id": "proj-fixture-001",
+  "workflow_stage": "planned",
+  "members": [
+    { "id": "m1", "name": "Alice", "skills": ["backend", "python"], "contribution_score": 0.7 },
+    { "id": "m2", "name": "Bob",   "skills": ["frontend", "react"], "contribution_score": 0.5 },
+    { "id": "m3", "name": "Carol", "skills": ["design", "ux"],       "contribution_score": 0.3 }
+  ],
+  "structured_goals": [
+    { "goal_id": "G1", "statement": "Build a responsive web dashboard", "priority": "high" },
+    { "goal_id": "G2", "statement": "Implement GLM-powered workflow engine", "priority": "critical" },
+    { "goal_id": "G3", "statement": "Write system documentation", "priority": "medium" }
+  ],
+  "rubric_criteria": [
+    { "criterion": "System Architecture", "weight_pct": 30, "notes": "Diagram required" },
+    { "criterion": "Code Quality",        "weight_pct": 25, "notes": "Modularity assessed" },
+    { "criterion": "UI/UX",               "weight_pct": 20, "notes": "Responsive design" },
+    { "criterion": "Documentation",       "weight_pct": 15, "notes": "README + API docs" },
+    { "criterion": "Presentation",        "weight_pct": 10, "notes": "Demo video" }
+  ],
+  "tasks": [
+    { "task_id": "T1", "title": "DB schema design",    "status": "done",        "priority": "critical", "estimated_hours": 3, "dependencies": [] },
+    { "task_id": "T2", "title": "API endpoint setup",  "status": "in_progress", "priority": "high",     "estimated_hours": 5, "dependencies": ["T1"] },
+    { "task_id": "T3", "title": "GLM integration",     "status": "pending",     "priority": "critical", "estimated_hours": 8, "dependencies": ["T2"] },
+    { "task_id": "T4", "title": "Frontend dashboard",  "status": "pending",     "priority": "high",     "estimated_hours": 6, "dependencies": ["T2"] },
+    { "task_id": "T5", "title": "Write documentation", "status": "pending",     "priority": "medium",   "estimated_hours": 2, "dependencies": [] }
+  ],
+  "milestones": [
+    { "milestone_id": "M1", "title": "Backend Ready",   "due_date_offset_days": 7,  "tasks": ["T1", "T2"] },
+    { "milestone_id": "M2", "title": "AI Integration",  "due_date_offset_days": 12, "tasks": ["T3"] },
+    { "milestone_id": "M3", "title": "Frontend + Docs", "due_date_offset_days": 14, "tasks": ["T4", "T5"] }
+  ],
+  "critical_path": ["T1", "T2", "T3"],
+  "role_assignments": [
+    { "member_id": "m1", "assigned_role": "Backend Lead",   "assigned_tasks": ["T2", "T3"], "workload_hours": 13 },
+    { "member_id": "m2", "assigned_role": "Frontend Lead",  "assigned_tasks": ["T4"],       "workload_hours": 6  },
+    { "member_id": "m3", "assigned_role": "Documentation",  "assigned_tasks": ["T5"],       "workload_hours": 2  }
+  ],
+  "last_risk_report": {
+    "project_health": "at_risk",
+    "health_score": 0.55,
+    "deadline_failure_probability": 0.42,
+    "risks": [
+      { "risk_id": "R1", "type": "deadline", "severity": "medium",
+        "description": "GLM integration has no buffer time", "affected_tasks": ["T3"] }
+    ],
+    "inactive_members": [],
+    "recovery_actions": [
+      { "action_id": "A1", "description": "Compress T5 to 1 hour", "target": "task", "priority": "soon" }
+    ]
+  },
+  "submission_report": {},
+  "deadline_date": "2025-12-01",
+  "activity_history": [],
+  "decision_history": [],
+  "created_at": "2025-11-15T08:00:00Z",
+  "updated_at": "2025-11-17T14:30:00Z"
+}
