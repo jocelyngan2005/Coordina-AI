@@ -9,8 +9,8 @@ from typing import List
 class Settings(BaseSettings):
     # Z.AI GLM
     ZAI_API_KEY: str
-    ZAI_API_BASE_URL: str = "https://open.bigmodel.cn/api/paas/v4"
-    ZAI_MODEL: str = "glm-4"
+    ZAI_API_BASE_URL: str = "https://api.ilmu.ai/v1"
+    ZAI_MODEL: str = "ilmu-glm-5.1"
 
     # Database
     DATABASE_URL: str
