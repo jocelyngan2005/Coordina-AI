@@ -5,6 +5,7 @@ Database and Redis are mocked via dependency overrides.
 """
 
 import pytest
+import pytest_asyncio
 from unittest.mock import AsyncMock, patch, MagicMock
 from httpx import AsyncClient, ASGITransport
 
@@ -60,7 +61,7 @@ app.dependency_overrides[get_db] = override_get_db
 #  Fixtures                                                            #
 # ------------------------------------------------------------------ #
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac

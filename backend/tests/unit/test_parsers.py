@@ -85,7 +85,7 @@ class TestDocumentParser:
         mock_reader = MagicMock()
         mock_reader.pages = [mock_page1, mock_page2]
 
-        with patch("parsers.document_parser.PyPDF2.PdfReader", return_value=mock_reader):
+        with patch("PyPDF2.PdfReader", return_value=mock_reader):
             result = parser._extract_pdf(b"fake pdf")
 
         assert "Page one content" in result
@@ -104,7 +104,7 @@ class TestDocumentParser:
         mock_reader = MagicMock()
         mock_reader.pages = [mock_page1, mock_page2]
 
-        with patch("parsers.document_parser.PyPDF2.PdfReader", return_value=mock_reader):
+        with patch("PyPDF2.PdfReader", return_value=mock_reader):
             result = parser._extract_pdf(b"fake pdf")
 
         assert "Valid content" in result
@@ -124,7 +124,7 @@ class TestDocumentParser:
         mock_doc = MagicMock()
         mock_doc.paragraphs = [mock_p1, mock_p2, mock_p3]
 
-        with patch("parsers.document_parser.Document", return_value=mock_doc):
+        with patch("docx.Document", return_value=mock_doc):
             result = parser._extract_docx(b"fake docx")
 
         assert "First paragraph." in result
