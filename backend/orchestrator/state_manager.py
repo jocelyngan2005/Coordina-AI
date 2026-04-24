@@ -86,6 +86,7 @@ class StateManager:
             "milestones": [],
             "critical_path": [],
             "role_assignments": [],
+            "contribution_balance": [],
             "meeting_agenda": [],
             "activity_history": [],
             "decision_history": [],

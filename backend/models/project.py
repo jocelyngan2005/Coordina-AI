@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, DateTime, Text, Enum
+from sqlalchemy import String, DateTime, Text, Enum, Date, Integer, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
 import enum
@@ -27,7 +27,16 @@ class Project(Base):
     status: Mapped[ProjectStatus] = mapped_column(
         Enum(ProjectStatus), default=ProjectStatus.CREATED
     )
+
+    # Dates
+    start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deadline_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Workflow & team metadata
+    workflow_stage: Mapped[str] = mapped_column(String(50), default="created")  # created, analysed, planned, coordinated, monitoring, validated
+    team_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    confidence_score: Mapped[float | None] = mapped_column(Float, nullable=True)  # From instruction_analysis
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -43,3 +52,15 @@ class Project(Base):
     documents: Mapped[list["Document"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     decision_logs: Mapped[list["DecisionLog"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     workflow_events: Mapped[list["WorkflowEvent"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    structured_goals: Mapped[list["StructuredGoal"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    grading_criteria: Mapped[list["GradingCriterion"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    milestones: Mapped[list["Milestone"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    role_assignments: Mapped[list["RoleAssignment"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    contribution_balance: Mapped[list["ContributionBalance"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    meeting_agendas: Mapped[list["MeetingAgenda"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    accountability_pairs: Mapped[list["AccountabilityPair"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    activity_events: Mapped[list["ActivityEvent"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    detected_risks: Mapped[list["DetectedRisk"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    risk_reports: Mapped[list["RiskReport"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    submission_checklists: Mapped[list["SubmissionChecklist"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    submission_reports: Mapped[list["SubmissionReport"]] = relationship(back_populates="project", cascade="all, delete-orphan")

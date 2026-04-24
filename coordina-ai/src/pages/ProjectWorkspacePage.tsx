@@ -2,12 +2,12 @@ import { useState, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import PageLayout from '../components/layout/PageLayout';
 import { MOCK_PROJECT, MOCK_RISKS, MOCK_RUBRIC } from '../data/mockData';
-import type { Task, RiskAlert, RubricItem, Project } from '../types';
+import type { Task, RiskAlert, RubricItem, Project, ChecklistItem } from '../types';
 import { projectsApi } from '../api/projects';
 import { tasksApi } from '../api/tasks';
 import { teamsApi } from '../api/teams';
 import { workflowApi, analyticsApi } from '../api/workflow';
-import { mapProject, extractRubric, extractRisks } from '../api/mappers';
+import { mapProject, mapTasks, mapTeamMembers, extractRubric, extractRisks, mapRubric, mapRisks } from '../api/mappers';
 
 /* ─── Helpers ─── */
 function Avatar({ initials, size = 24, color }: { initials: string; size?: number; color?: string }) {
@@ -40,6 +40,7 @@ const statusConfig: Record<Task['status'], { color: string; label: string }> = {
   done: { color: '#274133', label: 'Done' },
   in_progress: { color: '#ce9042', label: 'In Progress' },
   backlog: { color: '#9ca3af', label: 'Backlog' },
+  pending: { color: '#6b7280', label: 'Pending' },
 };
 
 const priorityColor: Record<string, string> = {
@@ -269,6 +270,7 @@ function GanttTimeline({ tasks }: { tasks: Task[] }) {
 /* ─── Section C: Accountability + Task List ─── */
 const TAB_LIST: { key: Task['status']; label: string; color: string }[] = [
   { key: 'in_progress', label: 'In Progress', color: '#f59e0b' },
+  { key: 'pending', label: 'Pending', color: '#6b7280' },
   { key: 'backlog', label: 'Backlog', color: 'var(--grey-400)' },
   { key: 'done', label: 'Done', color: '#22c55e' },
 ];
@@ -400,47 +402,45 @@ function AccountabilityAndTasks({ project }: { project: Project }) {
   );
 }
 
-/* ─── Section D: Required Artifacts ─── */
-const ARTIFACTS = [
-  { name: 'Project Brief', status: 'found', file: 'project_brief.pdf' },
-  { name: 'Grading Rubric', status: 'found', file: 'grading_rubric.docx' },
-  { name: 'Meeting Transcripts', status: 'found', file: '3 files uploaded' },
-  { name: 'Technical Documentation', status: 'partial', file: 'architecture.md — API docs missing' },
-  { name: 'Test Report', status: 'missing', file: 'Not uploaded' },
-  { name: 'Final Presentation Slides', status: 'missing', file: 'Not uploaded' },
+/* ─── Section D: Submission Checklist ─── */
+const MOCK_CHECKLIST: ChecklistItem[] = [
+  { item: 'Project Brief uploaded', status: 'complete', priority: 'high' },
+  { item: 'Grading Rubric uploaded', status: 'complete', priority: 'high' },
+  { item: 'Meeting Transcripts submitted', status: 'complete', priority: 'medium' },
+  { item: 'Technical Documentation complete', status: 'in_progress', priority: 'high' },
+  { item: 'Test Report submitted', status: 'pending', priority: 'high' },
+  { item: 'Final Presentation Slides ready', status: 'pending', priority: 'medium' },
 ];
 
-const artColors = { found: '#274133', partial: '#ce9042', missing: '#9ca3af' };
-
-function ArtifactsCard() {
-  const foundCount = ARTIFACTS.filter((a) => a.status === 'found').length;
+function ArtifactsCard({ checklist }: { checklist: ChecklistItem[] }) {
+  const items = checklist.length > 0 ? checklist : MOCK_CHECKLIST;
+  const completeCount = items.filter((c) => c.status === 'complete').length;
   return (
     <div style={{ ...card, padding: 0, display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '16px 18px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <SectionTitle>Required Artifacts</SectionTitle>
+        <SectionTitle>Submission Checklist</SectionTitle>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)' }}>{foundCount}/{ARTIFACTS.length} complete</span>
+          <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)' }}>{completeCount}/{items.length} complete</span>
         </div>
       </div>
       <div style={{ background: 'var(--white)', margin: '0 12px 12px', borderRadius: 8, display: 'flex', flexDirection: 'column', flex: 1, border: '1px solid var(--border)' }}>
-        {ARTIFACTS.map((a, i) => {
-          const color = artColors[a.status as keyof typeof artColors];
-          const isFound = a.status === 'found';
-          const isPartial = a.status === 'partial';
+        {items.map((c, i) => {
+          const isComplete = c.status === 'complete';
+          const isInProgress = c.status === 'in_progress';
+          const color = isComplete ? '#274133' : isInProgress ? '#ce9042' : '#9ca3af';
           return (
-            <div key={a.name} style={{ display: 'flex', gap: 12, padding: '10px 14px', alignItems: 'center', borderBottom: i < ARTIFACTS.length - 1 ? '1px solid var(--grey-100)' : 'none' }}>
+            <div key={c.item} style={{ display: 'flex', gap: 12, padding: '10px 14px', alignItems: 'center', borderBottom: i < items.length - 1 ? '1px solid var(--grey-100)' : 'none' }}>
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0 }}>
-                <circle cx="9" cy="9" r="8" stroke={color} strokeWidth="1.8" fill={isFound ? color : 'none'} />
-                {isFound && <polyline points="5,9 8,12 13,6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />}
-                {isPartial && <path d="M9 1a8 8 0 0 1 0 16" stroke={color} strokeWidth="1.8" fill={color} strokeLinecap="round" />}
+                <circle cx="9" cy="9" r="8" stroke={color} strokeWidth="1.8" fill={isComplete ? color : 'none'} />
+                {isComplete && <polyline points="5,9 8,12 13,6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />}
+                {isInProgress && <path d="M9 1a8 8 0 0 1 0 16" stroke={color} strokeWidth="1.8" fill={color} strokeLinecap="round" />}
               </svg>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 12, fontWeight: 500, color: isFound ? 'var(--grey-900)' : 'var(--grey-700)', marginBottom: 1 }}>{a.name}</p>
-                <p style={{ fontSize: 10, color: 'var(--text-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.file}</p>
+                <p style={{ fontSize: 12, fontWeight: 500, color: isComplete ? 'var(--grey-900)' : 'var(--grey-700)', marginBottom: 1 }}>{c.item}</p>
+                {c.priority && (
+                  <p style={{ fontSize: 10, color: 'var(--text-3)' }}>{c.priority} priority</p>
+                )}
               </div>
-              {a.status === 'missing' && (
-                <button style={{ fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 6, flexShrink: 0, background: 'var(--grey-900)', color: 'var(--white)', border: 'none', cursor: 'pointer' }}>Upload</button>
-              )}
             </div>
           );
         })}
@@ -454,7 +454,7 @@ const MY_MEMBER_ID = 'm1';
 type TaskState = 'none' | 'in_progress' | 'done';
 
 function MyTasksCard({ tasks }: { tasks: Task[] }) {
-  const myTasks = tasks.filter((t) => t.assigneeId === MY_MEMBER_ID);
+  const myTasks = tasks.filter((t) => t.assignedTo.includes(MY_MEMBER_ID));
 
   const [states, setStates] = useState<Map<string, TaskState>>(() => {
     const m = new Map<string, TaskState>();
@@ -532,13 +532,20 @@ function MyTasksCard({ tasks }: { tasks: Task[] }) {
 /* ─── Notification Bell ─── */
 const severityColor: Record<string, string> = { high: '#7d2027', medium: '#ce9042', low: '#274133' };
 const severityBg: Record<string, string> = { high: '#f9e8e9', medium: '#fdf3e3', low: '#e6efeb' };
-const typeIcon: Record<string, string> = { inactivity: '👤', deadline: '⏰', ambiguity: '❓', missing_artifact: '📄' };
+const typeIcon: Record<string, string> = {
+  inactivity: '👤',
+  deadline_risk: '⏰',
+  dependency_blocker: '🔗',
+  ambiguity: '❓',
+  missing_artifact: '📄',
+};
 type AlertAction = { label: string; variant: 'primary' | 'ghost' };
-const actionsByType: Record<string, AlertAction[]> = {
-  inactivity: [{ label: 'Send Reminder', variant: 'primary' }, { label: 'Reassign Task', variant: 'ghost' }],
-  deadline: [{ label: 'Adjust Timeline', variant: 'primary' }, { label: 'Escalate', variant: 'ghost' }],
+const actionsByRecommendedType: Record<string, AlertAction[]> = {
+  member_engagement: [{ label: 'Send Reminder', variant: 'primary' }, { label: 'Reassign Task', variant: 'ghost' }],
+  deadline_risk: [{ label: 'Adjust Timeline', variant: 'primary' }, { label: 'Escalate', variant: 'ghost' }],
+  scope_issue: [{ label: 'Request Clarification', variant: 'primary' }, { label: 'Flag for Review', variant: 'ghost' }],
+  dependency_blocker: [{ label: 'Resolve Dependency', variant: 'primary' }, { label: 'Replan Tasks', variant: 'ghost' }],
   ambiguity: [{ label: 'Request Clarification', variant: 'primary' }, { label: 'Flag for Review', variant: 'ghost' }],
-  missing_artifact: [{ label: 'Upload Artifact', variant: 'primary' }, { label: 'Assign Owner', variant: 'ghost' }],
 };
 
 function NotificationBell({ notifications }: { notifications: RiskAlert[] }) {
@@ -601,7 +608,7 @@ function NotificationBell({ notifications }: { notifications: RiskAlert[] }) {
                         </div>
                         <p style={{ fontSize: 11, color: 'var(--grey-600)', lineHeight: 1.4, marginBottom: 7 }}>{risk.detail}</p>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 4 }}>
-                          {(actionsByType[risk.type] ?? []).map((btn) => (
+                          {(actionsByRecommendedType[risk.recommended_action_type ?? ''] ?? actionsByRecommendedType.scope_issue).map((btn) => (
                             <button
                               key={btn.label}
                               style={{ ...(btn.variant === 'primary' ? btnPrimary : btnGhost), justifyContent: 'center', width: '100%' }}
@@ -649,6 +656,7 @@ export default function ProjectWorkspacePage() {
   const [project, setProject] = useState<Project | null>(null);
   const [rubric, setRubric] = useState<RubricItem[]>(MOCK_RUBRIC);
   const [risks, setRisks] = useState<RiskAlert[]>(MOCK_RISKS);
+  const [submissionChecklist, setSubmissionChecklist] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(!isMockId);
   const [apiAvailable, setApiAvailable] = useState(true);
 
@@ -682,21 +690,60 @@ export default function ProjectWorkspacePage() {
             ? Math.round(analytics.health_score)
             : 0;
 
-        const mapped = mapProject(
-          backendProject,
-          backendTasks,
-          backendMembers,
-          completionPct,
-          riskScore,
-        );
-        setProject(mapped);
-
         if (workflowState) {
-          const mappedRubric = extractRubric(workflowState.submission_report);
-          if (mappedRubric) setRubric(mappedRubric);
+          // Use GLM planning tasks if available, fall back to DB tasks
+          const glmTasks = Array.isArray(workflowState.tasks) && workflowState.tasks.length > 0
+            ? mapTasks(workflowState.tasks as Record<string, unknown>[])
+            : backendTasks.map((t) => ({
+                id: t.id, title: t.title, status: t.status,
+                assigneeId: t.assignee_id ?? undefined,
+                assignedTo: t.assignee_id ? [t.assignee_id] : [],
+                startDate: t.created_at?.slice(0, 10) ?? '',
+                dueDate: t.due_date?.slice(0, 10) ?? '',
+                priority: t.priority, tags: [], description: t.description ?? '',
+              } as import('../types').Task));
 
-          const mappedRisks = extractRisks(workflowState.last_risk_report);
-          if (mappedRisks) setRisks(mappedRisks);
+          // Use GLM coordination members if available, fall back to DB members
+          const roleAssignments = (workflowState.role_assignments ?? []) as Record<string, unknown>[];
+          const contributionBalance = (workflowState.contribution_balance ?? []) as Record<string, unknown>[];
+          const glmMembers = roleAssignments.length > 0
+            ? mapTeamMembers(roleAssignments, contributionBalance)
+            : backendMembers.map((m) => ({
+                id: m.id, name: m.name, role: m.skills[0] ?? 'Member',
+                initials: m.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2),
+                contributionScore: Math.round(m.contribution_score),
+                lastActive: 'Recently', taskCount: 0,
+              }));
+
+          const mapped = mapProject(backendProject, backendTasks, backendMembers, completionPct, riskScore);
+          setProject({ ...mapped, tasks: glmTasks, teamMembers: glmMembers });
+
+          // Submission readiness
+          const submissionResult = workflowState.submission_report as Record<string, unknown>;
+          const mappedRubric = mapRubric(submissionResult);
+          if (mappedRubric.length > 0) setRubric(mappedRubric);
+          else {
+            const fallback = extractRubric(submissionResult);
+            if (fallback) setRubric(fallback);
+          }
+
+          const rawChecklist = submissionResult?.submission_checklist;
+          if (Array.isArray(rawChecklist) && rawChecklist.length > 0) {
+            setSubmissionChecklist(rawChecklist as ChecklistItem[]);
+          }
+
+          // Risk detection
+          const riskResult = workflowState.last_risk_report as Record<string, unknown>;
+          const executedAt = String((workflowState.last_risk_report as Record<string, unknown>)?.executed_at ?? '');
+          const mappedRisks = mapRisks(riskResult, executedAt);
+          if (mappedRisks.length > 0) setRisks(mappedRisks);
+          else {
+            const fallback = extractRisks(riskResult);
+            if (fallback) setRisks(fallback);
+          }
+        } else {
+          const mapped = mapProject(backendProject, backendTasks, backendMembers, completionPct, riskScore);
+          setProject(mapped);
         }
 
         setApiAvailable(true);
@@ -755,7 +802,7 @@ export default function ProjectWorkspacePage() {
         <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr 2fr', gap: 14, alignItems: 'start' }}>
           <AccountabilityAndTasks project={p} />
           <MyTasksCard tasks={p.tasks} />
-          <ArtifactsCard />
+          <ArtifactsCard checklist={submissionChecklist} />
         </div>
       </div>
     </PageLayout>

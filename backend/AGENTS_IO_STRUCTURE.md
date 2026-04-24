@@ -1,5 +1,7 @@
 # Coordina-AI Agent I/O Structure Guide
 
+**Last Updated:** 2026-04-25
+
 This document defines the input and output structure for all Coordina-AI agents.
 
 ## Overview
@@ -181,18 +183,36 @@ On error:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `tasks` | `list[dict]` | Task objects with `id`, `title`, `description`, `status`, `estimated_hours`, `dependencies`, `assigned_to` |
+| `tasks` | `list[dict]` | Task objects — see task structure below |
 | `total_estimated_hours` | `float` | Sum of all task estimates |
-| `milestones` | `list[dict]` | Key milestones with target dates |
-| `dependency_graph` | `dict` | Task dependencies mapping |
+| `milestones` | `list[dict]` | Key milestones with `milestone_id`, `title`, `due_date`, `tasks` |
+| `critical_path` | `list[string]` | Task IDs on the critical path |
+| `risk_flags` | `list[string]` | Planning-level warnings (e.g. capacity issues) |
 | `capacity_analysis` | `dict` | See below |
+
+### Task Substructure
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Task ID (e.g. `"T1"`) |
+| `title` | `string` | Short task title |
+| `description` | `string` | Detailed description |
+| `estimated_hours` | `int` | Work estimate in hours |
+| `phase` | `string` | One of: `"setup"`, `"design"`, `"implementation"`, `"testing"`, `"documentation"` |
+| `priority` | `string` | One of: `"high"`, `"medium"`, `"low"` |
+| `dependencies` | `list[string]` | IDs of prerequisite tasks |
+| `assigned_to` | `list[string]` | Member IDs assigned to this task (array, may be multiple) |
+| `startDate` | `string` | ISO date — project_start_date + dependency offsets |
+| `endDate` | `string` | ISO date — startDate + ceil(estimated_hours / 6) days |
+| `status` | `string` | Always `"pending"` on initial plan creation |
+| `percentage_utilized` | `float` | Assignee capacity utilisation (0–100) |
 
 ### Capacity Analysis Substructure
 
 ```json
 {
   "total_estimated_hours": 120,
-  "team_capacity_hours": 112,  // team_size * days_available * 2 hrs/day
+  "team_capacity_hours": 112,
   "overloaded": true
 }
 ```
@@ -249,10 +269,13 @@ On error:
         "description": "Initialize version control, install dependencies, setup CI/CD",
         "status": "pending",
         "estimated_hours": 4,
-        "dependencies": [],
-        "assigned_to": null,
         "phase": "setup",
-        "priority": "high"
+        "priority": "high",
+        "dependencies": [],
+        "assigned_to": ["M1"],
+        "startDate": "2026-04-24",
+        "endDate": "2026-04-25",
+        "percentage_utilized": 0
       },
       {
         "id": "T2",
@@ -260,10 +283,13 @@ On error:
         "description": "Create tables for users, roles, permissions",
         "status": "pending",
         "estimated_hours": 8,
-        "dependencies": ["T1"],
-        "assigned_to": null,
         "phase": "design",
-        "priority": "high"
+        "priority": "high",
+        "dependencies": ["T1"],
+        "assigned_to": ["M1"],
+        "startDate": "2026-04-26",
+        "endDate": "2026-04-27",
+        "percentage_utilized": 0
       },
       {
         "id": "T3",
@@ -271,10 +297,13 @@ On error:
         "description": "Sign up, login, logout endpoints with JWT",
         "status": "pending",
         "estimated_hours": 12,
-        "dependencies": ["T1", "T2"],
-        "assigned_to": null,
         "phase": "implementation",
-        "priority": "high"
+        "priority": "high",
+        "dependencies": ["T1", "T2"],
+        "assigned_to": ["M3"],
+        "startDate": "2026-04-28",
+        "endDate": "2026-04-30",
+        "percentage_utilized": 0
       },
       {
         "id": "T4",
@@ -282,10 +311,13 @@ On error:
         "description": "CRUD operations for user profiles",
         "status": "pending",
         "estimated_hours": 10,
-        "dependencies": ["T3"],
-        "assigned_to": null,
         "phase": "implementation",
-        "priority": "high"
+        "priority": "high",
+        "dependencies": ["T3"],
+        "assigned_to": ["M3"],
+        "startDate": "2026-05-01",
+        "endDate": "2026-05-02",
+        "percentage_utilized": 0
       },
       {
         "id": "T5",
@@ -293,10 +325,13 @@ On error:
         "description": "Role assignment and permission checking",
         "status": "pending",
         "estimated_hours": 12,
-        "dependencies": ["T2", "T3"],
-        "assigned_to": null,
         "phase": "implementation",
-        "priority": "medium"
+        "priority": "medium",
+        "dependencies": ["T2", "T3"],
+        "assigned_to": ["M1", "M3"],
+        "startDate": "2026-05-01",
+        "endDate": "2026-05-03",
+        "percentage_utilized": 0
       },
       {
         "id": "T6",
@@ -304,10 +339,13 @@ On error:
         "description": "Test all endpoints and business logic",
         "status": "pending",
         "estimated_hours": 16,
-        "dependencies": ["T3", "T4", "T5"],
-        "assigned_to": null,
         "phase": "testing",
-        "priority": "medium"
+        "priority": "medium",
+        "dependencies": ["T3", "T4", "T5"],
+        "assigned_to": ["M2", "M4"],
+        "startDate": "2026-05-04",
+        "endDate": "2026-05-07",
+        "percentage_utilized": 0
       },
       {
         "id": "T7",
@@ -315,10 +353,13 @@ On error:
         "description": "Document all endpoints, request/response formats",
         "status": "pending",
         "estimated_hours": 6,
-        "dependencies": ["T3", "T4", "T5"],
-        "assigned_to": null,
         "phase": "documentation",
-        "priority": "low"
+        "priority": "low",
+        "dependencies": ["T3", "T4", "T5"],
+        "assigned_to": ["M3"],
+        "startDate": "2026-05-04",
+        "endDate": "2026-05-05",
+        "percentage_utilized": 0
       },
       {
         "id": "T8",
@@ -326,61 +367,56 @@ On error:
         "description": "End-to-end testing and bug fixes",
         "status": "pending",
         "estimated_hours": 8,
-        "dependencies": ["T6"],
-        "assigned_to": null,
         "phase": "testing",
-        "priority": "high"
+        "priority": "high",
+        "dependencies": ["T6"],
+        "assigned_to": ["M2"],
+        "startDate": "2026-05-08",
+        "endDate": "2026-05-09",
+        "percentage_utilized": 0
       }
     ],
     "total_estimated_hours": 76,
     "milestones": [
       {
-        "id": "M1",
+        "milestone_id": "M1",
         "title": "Setup Complete",
-        "target_date": "2026-04-26",
+        "due_date": "2026-04-25",
         "tasks": ["T1"]
       },
       {
-        "id": "M2",
+        "milestone_id": "M2",
         "title": "Database Schema Finalized",
-        "target_date": "2026-04-29",
+        "due_date": "2026-04-27",
         "tasks": ["T2"]
       },
       {
-        "id": "M3",
+        "milestone_id": "M3",
         "title": "Core Implementation Complete",
-        "target_date": "2026-05-08",
+        "due_date": "2026-05-03",
         "tasks": ["T3", "T4", "T5"]
       },
       {
-        "id": "M4",
+        "milestone_id": "M4",
         "title": "Testing Complete",
-        "target_date": "2026-05-13",
+        "due_date": "2026-05-09",
         "tasks": ["T6", "T8"]
       },
       {
-        "id": "M5",
+        "milestone_id": "M5",
         "title": "Ready for Submission",
-        "target_date": "2026-05-15",
+        "due_date": "2026-05-15",
         "tasks": ["T7"]
       }
     ],
-    "dependency_graph": {
-      "T1": [],
-      "T2": ["T1"],
-      "T3": ["T1", "T2"],
-      "T4": ["T3"],
-      "T5": ["T2", "T3"],
-      "T6": ["T3", "T4", "T5"],
-      "T7": ["T3", "T4", "T5"],
-      "T8": ["T6"]
-    },
+    "critical_path": ["T1", "T2", "T3", "T5", "T6", "T8"],
+    "risk_flags": [
+      "T5 has multiple assignees — coordinate closely to avoid conflicts"
+    ],
     "capacity_analysis": {
       "total_estimated_hours": 76,
       "team_capacity_hours": 168,
-      "overloaded": false,
-      "hours_per_person": 19,
-      "capacity_utilization_percent": 45.2
+      "overloaded": false
     }
   },
   "executed_at": "2026-04-24T10:32:45.567Z",
@@ -408,11 +444,13 @@ On error:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `role_assignments` | `list[dict]` | Assignments with `member_id`, `role`, `tasks`, `workload_hours` |
-| `meeting_agenda` | `dict` | Agenda items and timing for next meeting |
-| `fairness_index` | `float` | Jain's fairness index (0.0-1.0) for workload distribution |
-| `contribution_balance` | `list[dict]` | Per-member contribution status |
-| `recommendations` | `list[string]` | Team coordination improvements |
+| `role_assignments` | `list[dict]` | Assignments with `member_id`, `name`, `role`, `assigned_tasks`, `workload_hours`, `percentage_utilized`, `reasoning` |
+| `contribution_balance` | `list[dict]` | Per-member `workload_score`, `contribution_score`, `balance_status` (0.0–1.0 scores) |
+| `workload_balance` | `dict` | Overall `status` (`balanced`, `overloaded`, `underutilised`) and `notes` |
+| `meeting_agenda` | `list[dict]` | Ordered agenda items with `order`, `topic`, `duration_minutes`, `owner` |
+| `accountability_pairs` | `list[dict]` | Task pairings with `task_id`, `primary`, `reviewer` |
+| `fairness_index` | `float` | Jain's fairness index (0.0–1.0) computed from workload hours |
+| `flags` | `list[string]` | Team coordination warnings or action items |
 
 ### Input JSON Structure
 
@@ -514,7 +552,7 @@ On error:
         "assigned_tasks": ["T1", "T2"],
         "workload_hours": 12,
         "percentage_utilized": 35.3,
-        "rationale": "Senior backend experience, excellent contribution score"
+        "reasoning": "Senior backend experience, excellent contribution score"
       },
       {
         "member_id": "M2",
@@ -523,7 +561,7 @@ On error:
         "assigned_tasks": ["T4", "T5"],
         "workload_hours": 14,
         "percentage_utilized": 41.2,
-        "rationale": "Frontend specialist, good testing background"
+        "reasoning": "Frontend specialist, good testing background"
       },
       {
         "member_id": "M3",
@@ -532,7 +570,7 @@ On error:
         "assigned_tasks": ["T3", "T7"],
         "workload_hours": 18,
         "percentage_utilized": 52.9,
-        "rationale": "Backend skills, with mentorship from Alice"
+        "reasoning": "Backend skills, with mentorship from Alice"
       },
       {
         "member_id": "M4",
@@ -541,36 +579,9 @@ On error:
         "assigned_tasks": ["T5", "T6"],
         "workload_hours": 12,
         "percentage_utilized": 35.3,
-        "rationale": "Part-time availability, frontend + testing skills"
+        "reasoning": "Part-time availability, frontend + testing skills"
       }
     ],
-    "meeting_agenda": {
-      "next_meeting_date": "2026-04-25T10:00:00Z",
-      "duration_minutes": 45,
-      "items": [
-        {
-          "topic": "Project kickoff and roles confirmation",
-          "time_minutes": 10,
-          "owner": "M1"
-        },
-        {
-          "topic": "Database schema review",
-          "time_minutes": 15,
-          "owner": "M1"
-        },
-        {
-          "topic": "Frontend setup and design system",
-          "time_minutes": 10,
-          "owner": "M2"
-        },
-        {
-          "topic": "Testing strategy",
-          "time_minutes": 10,
-          "owner": "M4"
-        }
-      ]
-    },
-    "fairness_index": 0.978,
     "contribution_balance": [
       {
         "member_id": "M1",
@@ -601,11 +612,24 @@ On error:
         "balance_status": "well-balanced"
       }
     ],
-    "recommendations": [
-      "Pair Charlie with Alice for mentorship on backend tasks",
-      "Schedule pair programming sessions between frontend and backend teams",
-      "Monitor Charlie's progress closely; offer additional support if needed",
-      "Plan daily standup meetings to maintain momentum"
+    "workload_balance": {
+      "status": "balanced",
+      "notes": "Workload is distributed reasonably; Diana has reduced hours due to part-time availability"
+    },
+    "meeting_agenda": [
+      { "order": 1, "topic": "Project kickoff and roles confirmation", "duration_minutes": 10, "owner": "M1" },
+      { "order": 2, "topic": "Database schema review", "duration_minutes": 15, "owner": "M1" },
+      { "order": 3, "topic": "Frontend setup and design system", "duration_minutes": 10, "owner": "M2" },
+      { "order": 4, "topic": "Testing strategy", "duration_minutes": 10, "owner": "M4" }
+    ],
+    "accountability_pairs": [
+      { "task_id": "T3", "primary": "M3", "reviewer": "M1" },
+      { "task_id": "T5", "primary": "M1", "reviewer": "M2" }
+    ],
+    "fairness_index": 0.978,
+    "flags": [
+      "Monitor Charlie closely — highest workload utilisation at 52.9%",
+      "Diana is part-time; avoid assigning critical path tasks"
     ]
   },
   "executed_at": "2026-04-24T10:35:20.890Z",
@@ -642,13 +666,27 @@ On error:
 | Field | Type | Description |
 |-------|------|-------------|
 | `project_health` | `string` | One of: `"on_track"`, `"at_risk"`, `"critical"` |
-| `deadline_failure_probability` | `float` | 0.0-1.0 probability of missing deadline |
-| `identified_risks` | `list[dict]` | Risk objects with `type`, `severity`, `description` |
-| `inactive_members` | `list[string]` | Member IDs inactive > 2 days |
-| `inactivity_alert` | `boolean` | True if any inactive members |
-| `auto_recovery_triggered` | `boolean` | True if failure_prob ≥ 50% |
-| `recovery_urgency` | `string` | One of: `"immediate"`, `"soon"`, `"monitor"` |
-| `recommended_actions` | `list[string]` | Recovery steps if triggered |
+| `health_score` | `float` | 0.0–1.0 overall project health score |
+| `deadline_failure_probability` | `float` | 0.0–1.0 probability of missing deadline |
+| `identified_risks` | `list[dict]` | Risk objects — see risk structure below |
+| `inactive_members` | `list[dict]` | Members with `member_id`, `last_activity_days_ago`, `recommended_action` |
+| `daily_completion_rate` | `float` | Current tasks completed per day |
+| `projected_completion_rate` | `float` | Projected rate needed to hit deadline |
+| `inactivity_alert` | `boolean` | True if any inactive members (computed, not from GLM) |
+| `auto_recovery_triggered` | `boolean` | True if `deadline_failure_probability` ≥ 50% (computed) |
+| `recovery_urgency` | `string` | `"immediate"` (≥75%), `"soon"` (≥50%), `"monitor"` (computed) |
+
+### Risk Item Substructure
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Risk ID (e.g. `"R1"`) |
+| `type` | `string` | One of: `"inactivity"`, `"deadline_risk"`, `"dependency_blocker"`, `"ambiguity"`, `"missing_artifact"` |
+| `severity` | `string` | One of: `"low"`, `"medium"`, `"high"` |
+| `description` | `string` | What the risk is |
+| `impact` | `string` | What happens if unaddressed |
+| `recommended_action_type` | `string` | Button routing key — one of: `"member_engagement"`, `"deadline_risk"`, `"scope_issue"`, `"dependency_blocker"`, `"ambiguity"` |
+| `recommended_action` | `string` | Specific suggested recovery step |
 
 ### Input JSON Structure
 
@@ -720,74 +758,63 @@ On error:
   "status": "success",
   "result": {
     "project_health": "at_risk",
+    "health_score": 0.52,
     "deadline_failure_probability": 0.58,
     "identified_risks": [
       {
         "id": "R1",
         "type": "inactivity",
         "severity": "high",
-        "member_id": "M3",
-        "member_name": "Charlie",
-        "description": "No activity for 4 days (last activity: 2026-04-20)",
-        "impact": "Could cause blockers if assigned to critical path tasks",
-        "recommended_action": "Check in with Charlie, offer support, reassign if needed"
+        "description": "Charlie has had no activity for 4 days (last: 2026-04-20)",
+        "impact": "Could cause blockers on critical path tasks assigned to Charlie",
+        "recommended_action_type": "member_engagement",
+        "recommended_action": "Check in with Charlie, offer support, reassign if no response within 24h"
       },
       {
         "id": "R2",
         "type": "inactivity",
         "severity": "medium",
-        "member_id": "M2",
-        "member_name": "Bob",
-        "description": "No activity for 2 days (last activity: 2026-04-22)",
-        "impact": "Potential slowdown on assigned tasks",
-        "recommended_action": "Follow up with Bob on progress"
+        "description": "Bob has had no activity for 2 days (last: 2026-04-22)",
+        "impact": "Potential slowdown on frontend tasks",
+        "recommended_action_type": "member_engagement",
+        "recommended_action": "Follow up with Bob on progress and blockers"
       },
       {
         "id": "R3",
         "type": "deadline_risk",
         "severity": "high",
-        "description": "Current pace suggests 58% chance of missing May 15 deadline",
-        "impact": "Only 50% of tasks are on track or complete",
-        "recommended_action": "Accelerate critical path tasks, consider scope reduction"
+        "description": "Current velocity suggests 58% chance of missing the May 15 deadline",
+        "impact": "Only 50% of tasks are on track or complete at current pace",
+        "recommended_action_type": "deadline_risk",
+        "recommended_action": "Accelerate critical path tasks T3 and T5; consider scope reduction"
       },
       {
         "id": "R4",
         "type": "dependency_blocker",
         "severity": "medium",
-        "description": "T3 and T4 depend on T2 completion (currently 50% done)",
-        "impact": "Backend work cannot start until database schema finalized",
-        "recommended_action": "Ensure T2 completion by 2026-04-28"
+        "description": "T3 and T4 are blocked on T2 (currently 50% complete)",
+        "impact": "Backend implementation cannot start until database schema is finalized",
+        "recommended_action_type": "dependency_blocker",
+        "recommended_action": "Prioritize T2 completion before 2026-04-28 to unblock T3"
       }
     ],
     "inactive_members": [
       {
         "member_id": "M3",
-        "name": "Charlie",
-        "days_inactive": 4,
-        "last_activity": "2026-04-20T09:15:00Z"
+        "last_activity_days_ago": 4,
+        "recommended_action": "Immediate check-in required"
       },
       {
         "member_id": "M2",
-        "name": "Bob",
-        "days_inactive": 2,
-        "last_activity": "2026-04-22T14:30:00Z"
+        "last_activity_days_ago": 2,
+        "recommended_action": "Follow up today"
       }
     ],
+    "daily_completion_rate": 0.045,
+    "projected_completion_rate": 0.095,
     "inactivity_alert": true,
     "auto_recovery_triggered": true,
-    "recovery_urgency": "soon",
-    "recommended_actions": [
-      "Schedule immediate check-in with inactive members",
-      "Review task assignments for blockers",
-      "Consider scope reduction if deadline risk remains high",
-      "Increase communication frequency (daily standups)",
-      "Identify and mitigate critical path dependencies",
-      "Provide additional resources or support where needed"
-    ],
-    "daily_completion_rate": 0.045,
-    "days_remaining": 21,
-    "projected_completion_rate": 0.945,
-    "estimated_tasks_by_deadline": 3.8
+    "recovery_urgency": "soon"
   },
   "executed_at": "2026-04-24T10:38:15.234Z",
   "duration_seconds": 1.92
@@ -814,12 +841,26 @@ On error:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `readiness_score` | `int` | 0-100, overall readiness percentage |
+| `readiness_score` | `int` | 0–100, overall readiness percentage |
 | `recommendation` | `string` | One of: `"ready_to_submit"`, `"needs_work"`, `"not_ready"` |
-| `rubric_coverage` | `list[dict]` | Coverage per criterion with `status` field |
-| `coverage_summary` | `dict` | Counts: `complete`, `partial`, `missing`, `total` |
-| `missing_items` | `list[string]` | Specific deliverables or artifacts still needed |
-| `submission_checklist` | `list[dict]` | Final checklist items with completion status |
+| `rubric_coverage` | `list[dict]` | Coverage per criterion — see rubric item structure below |
+| `coverage_summary` | `dict` | Counts: `covered`, `partial`, `missing`, `total` (computed) |
+| `missing_artefacts` | `list[string]` | Required files or artifacts not yet uploaded |
+| `submission_checklist` | `list[dict]` | Checklist items with `item`, `status`, `priority` |
+| `last_minute_risks` | `list[string]` | High-priority risks to address before submitting |
+
+### Rubric Coverage Item Substructure
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `criterion_id` | `string` | Unique ID (e.g. `"C1"`) |
+| `criterion_name` | `string` | Human-readable criterion name |
+| `maxScore` | `int` | Maximum points for this criterion (derived from weight) |
+| `score` | `int` | Points earned so far (≤ maxScore) |
+| `weight` | `float` | Decimal fraction of total grade (e.g. `0.25` = 25%) |
+| `status` | `string` | One of: `"covered"`, `"partial"`, `"missing"` |
+| `evidence` | `string` | Comma-joined evidence items |
+| `feedback` | `string` | Specific feedback or notes for this criterion |
 
 ### Scoring Thresholds
 
@@ -911,142 +952,87 @@ On error:
       {
         "criterion_id": "C1",
         "criterion_name": "Working Authentication System",
-        "status": "complete",
+        "maxScore": 25,
         "score": 25,
-        "evidence": [
-          "Sign up endpoint working",
-          "Login endpoint working with JWT",
-          "Logout functionality implemented"
-        ],
+        "weight": 0.25,
+        "status": "covered",
+        "evidence": "Sign up endpoint working; Login with JWT; Logout implemented",
         "feedback": "Full marks: All authentication features implemented correctly"
       },
       {
         "criterion_id": "C2",
         "criterion_name": "Database Design",
-        "status": "complete",
+        "maxScore": 20,
         "score": 20,
-        "evidence": [
-          "Users table with proper fields",
-          "Roles and permissions tables",
-          "Foreign key relationships defined"
-        ],
+        "weight": 0.20,
+        "status": "covered",
+        "evidence": "Users table with proper fields; Roles and permissions tables; Foreign key relationships defined",
         "feedback": "Full marks: Schema is well-designed and normalized"
       },
       {
         "criterion_id": "C3",
         "criterion_name": "API Functionality",
+        "maxScore": 20,
+        "score": 16,
+        "weight": 0.20,
         "status": "partial",
-        "score": 18,
-        "evidence": [
-          "User CRUD endpoints working",
-          "Authentication endpoints functional",
-          "Missing: profile update endpoint"
-        ],
-        "feedback": "Mostly complete: Missing some endpoints, but core functionality works"
+        "evidence": "User CRUD endpoints working; Authentication endpoints functional",
+        "feedback": "Mostly complete: Missing profile update endpoint"
       },
       {
         "criterion_id": "C4",
         "criterion_name": "Code Quality",
+        "maxScore": 15,
+        "score": 11,
+        "weight": 0.15,
         "status": "partial",
-        "score": 12,
-        "evidence": [
-          "Well-organized structure",
-          "Some code duplication in validation",
-          "Inconsistent naming in some areas"
-        ],
-        "feedback": "Good structure but some refactoring needed"
+        "evidence": "Well-organized structure; Some code duplication in validation",
+        "feedback": "Good structure but some refactoring needed for consistency"
       },
       {
         "criterion_id": "C5",
         "criterion_name": "Documentation",
+        "maxScore": 10,
+        "score": 6,
+        "weight": 0.10,
         "status": "partial",
-        "score": 7,
-        "evidence": [
-          "README provided",
-          "Missing: API endpoint documentation"
-        ],
-        "feedback": "Basic documentation present but needs API docs"
+        "evidence": "README provided",
+        "feedback": "Basic documentation present but API endpoint docs are missing"
       },
       {
         "criterion_id": "C6",
         "criterion_name": "Testing",
-        "status": "missing",
+        "maxScore": 10,
         "score": 0,
-        "evidence": [],
-        "feedback": "No test coverage found"
+        "weight": 0.10,
+        "status": "missing",
+        "evidence": "",
+        "feedback": "No test coverage found — high priority to add before submission"
       }
     ],
     "coverage_summary": {
-      "complete": 2,
+      "covered": 2,
       "partial": 3,
       "missing": 1,
       "total": 6
     },
-    "missing_items": [
-      "Integration tests",
-      "Profile update endpoint",
-      "API endpoint documentation",
-      "Performance testing"
+    "missing_artefacts": [
+      "test_suite/ directory or equivalent",
+      "API documentation file (e.g. openapi.yaml or api_docs.md)"
     ],
     "submission_checklist": [
-      {
-        "item": "All authentication features implemented",
-        "status": "complete",
-        "priority": "high"
-      },
-      {
-        "item": "Database schema finalized",
-        "status": "complete",
-        "priority": "high"
-      },
-      {
-        "item": "Core API endpoints functional",
-        "status": "complete",
-        "priority": "high"
-      },
-      {
-        "item": "Code follows style guide",
-        "status": "in_progress",
-        "priority": "medium"
-      },
-      {
-        "item": "All endpoints documented",
-        "status": "pending",
-        "priority": "high"
-      },
-      {
-        "item": "Unit tests written",
-        "status": "pending",
-        "priority": "medium"
-      },
-      {
-        "item": "Integration tests written",
-        "status": "pending",
-        "priority": "medium"
-      },
-      {
-        "item": "README complete",
-        "status": "complete",
-        "priority": "low"
-      }
+      { "item": "All authentication features implemented", "status": "complete", "priority": "high" },
+      { "item": "Database schema finalized", "status": "complete", "priority": "high" },
+      { "item": "Core API endpoints functional", "status": "complete", "priority": "high" },
+      { "item": "README complete", "status": "complete", "priority": "low" },
+      { "item": "Code style consistent throughout", "status": "in_progress", "priority": "medium" },
+      { "item": "All endpoints documented", "status": "pending", "priority": "high" },
+      { "item": "Unit tests written", "status": "pending", "priority": "medium" },
+      { "item": "Integration tests written", "status": "pending", "priority": "medium" }
     ],
-    "areas_of_concern": [
-      "No test coverage detected - high priority to add before submission",
-      "Missing profile management endpoints",
-      "API documentation incomplete"
-    ],
-    "strengths": [
-      "Strong authentication implementation",
-      "Well-designed database schema",
-      "Good code organization",
-      "Working core functionality"
-    ],
-    "suggested_improvements": [
-      "Add comprehensive test suite (target >80% coverage)",
-      "Complete API endpoint documentation",
-      "Implement missing endpoints (profile management)",
-      "Refactor duplicate validation code",
-      "Add integration tests for workflows"
+    "last_minute_risks": [
+      "Testing criterion worth 10 points is completely unaddressed",
+      "Profile update endpoint missing — affects API Functionality score"
     ]
   },
   "executed_at": "2026-04-24T10:40:50.567Z",
@@ -1125,3 +1111,26 @@ Example error response:
 3. **Async Execution**: All agents execute asynchronously; use `executed_at` and `duration_seconds` for monitoring.
 
 4. **Logging**: All agent execution is logged with start, completion, and error details.
+
+5. **Workflow State Storage**: Key fields persisted to Redis project state after each stage:
+   - Planning → `tasks[]`, `milestones[]`, `critical_path[]`
+   - Coordination → `role_assignments[]`, `contribution_balance[]`, `meeting_agenda[]`
+   - Risk Detection → `last_risk_report` (full result dict)
+   - Submission Readiness → `submission_report` (full result dict)
+
+6. **Frontend Field Mapping**:
+   | Backend field | Frontend usage |
+   |---|---|
+   | `tasks[].assigned_to` (array) | `Task.assignedTo` (array) + `Task.assigneeId` (first element) |
+   | `tasks[].startDate` / `endDate` | `Task.startDate` / `Task.dueDate` |
+   | `tasks[].phase` | `Task.phase` + `Task.tags` |
+   | `rubric_coverage[].criterion_id` | `RubricItem.id` |
+   | `rubric_coverage[].criterion_name` | `RubricItem.criterion` |
+   | `rubric_coverage[].maxScore` | `RubricItem.maxScore` |
+   | `rubric_coverage[].weight` | `RubricItem.weight` (used as `flex` basis in progress bar) |
+   | `rubric_coverage[].status` (`covered`) | `RubricItem.status` |
+   | `identified_risks[].description` | `RiskAlert.message` |
+   | `identified_risks[].impact` | `RiskAlert.detail` |
+   | `identified_risks[].recommended_action_type` | `RiskAlert.recommended_action_type` (routes UI action buttons) |
+   | `contribution_balance[].contribution_score` × 100 | `TeamMember.contributionScore` |
+   | `submission_checklist[]` | `ChecklistItem[]` in Submission Checklist card |

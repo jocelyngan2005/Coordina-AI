@@ -6,20 +6,26 @@ export interface TeamMember {
   contributionScore: number;
   lastActive: string;
   taskCount: number;
+  workloadScore?: number;
+  balance_status?: 'well-balanced' | 'needs-monitoring';
 }
 
 export interface Task {
   id: string;
   title: string;
-  status: 'backlog' | 'in_progress' | 'done';
-  assigneeId: string;
+  status: 'pending' | 'backlog' | 'in_progress' | 'done';
+  assigneeId?: string;
+  assignedTo: string[];
   startDate: string;
   dueDate: string;
   priority: 'low' | 'medium' | 'high';
   tags: string[];
   description: string;
-  dependsOn?: string[]; // task IDs this task depends on
-  aiConfidence?: number; // 0-100, how critical to the rubric
+  phase?: 'setup' | 'design' | 'implementation' | 'testing' | 'documentation';
+  estimated_hours?: number;
+  percentage_utilized?: number;
+  dependsOn?: string[];
+  aiConfidence?: number;
 }
 
 export interface Project {
@@ -53,7 +59,19 @@ export interface Agent {
 }
 
 export type RiskSeverity = 'low' | 'medium' | 'high';
-export type RiskType = 'inactivity' | 'deadline' | 'ambiguity' | 'missing_artifact';
+export type RiskType =
+  | 'inactivity'
+  | 'deadline_risk'
+  | 'dependency_blocker'
+  | 'ambiguity'
+  | 'missing_artifact';
+
+export type RecommendedActionType =
+  | 'member_engagement'
+  | 'deadline_risk'
+  | 'scope_issue'
+  | 'dependency_blocker'
+  | 'ambiguity';
 
 export interface RiskAlert {
   id: string;
@@ -63,6 +81,8 @@ export interface RiskAlert {
   detail: string;
   timestamp: string;
   memberId?: string;
+  recommended_action?: string;
+  recommended_action_type?: RecommendedActionType;
 }
 
 export interface RubricItem {
@@ -71,8 +91,15 @@ export interface RubricItem {
   weight: number;
   status: 'covered' | 'partial' | 'missing';
   evidence: string;
+  feedback?: string;
   score: number;
   maxScore: number;
+}
+
+export interface ChecklistItem {
+  item: string;
+  status: 'complete' | 'in_progress' | 'pending';
+  priority?: 'high' | 'medium' | 'low';
 }
 
 export interface UploadedDoc {

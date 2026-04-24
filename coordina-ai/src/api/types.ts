@@ -54,6 +54,7 @@ export interface WorkflowState {
   milestones: unknown[];
   members: unknown[];
   role_assignments: unknown[];
+  contribution_balance: unknown[];
   last_risk_report: Record<string, unknown>;
   submission_report: Record<string, unknown>;
   deadline_date: string | null;
