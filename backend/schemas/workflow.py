@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 class RunAnalysisRequest(BaseModel):
     document_text: str
-    document_type: str = "brief"  # brief | rubric | combined
+    document_type: str = "brief"  # "brief" | "rubric" | "meeting_transcript" | "chat_logs"
 
 
 class RunPlanningRequest(BaseModel):
