@@ -11,7 +11,7 @@ export interface TeamMember {
 export interface Task {
   id: string;
   title: string;
-  status: 'backlog' | 'in_progress' | 'review' | 'done';
+  status: 'backlog' | 'in_progress' | 'done';
   assigneeId: string;
   startDate: string;
   dueDate: string;
