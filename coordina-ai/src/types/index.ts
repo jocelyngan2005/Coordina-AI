@@ -13,10 +13,13 @@ export interface Task {
   title: string;
   status: 'backlog' | 'in_progress' | 'review' | 'done';
   assigneeId: string;
+  startDate: string;
   dueDate: string;
   priority: 'low' | 'medium' | 'high';
   tags: string[];
   description: string;
+  dependsOn?: string[]; // task IDs this task depends on
+  aiConfidence?: number; // 0-100, how critical to the rubric
 }
 
 export interface Project {

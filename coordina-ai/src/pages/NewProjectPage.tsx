@@ -1,9 +1,6 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import PageLayout from '../components/layout/PageLayout';
-import TopBar from '../components/layout/TopBar';
 import Button from '../components/ui/Button';
-import Badge from '../components/ui/Badge';
 
 type DocType = 'brief' | 'rubric' | 'transcript' | 'chat_log';
 
@@ -81,17 +78,95 @@ export default function NewProjectPage() {
     background: 'var(--white)',
   };
 
+  function handleClose() {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate('/');
+  }
+
   return (
-    <PageLayout
-      topBar={
-        <TopBar
-          title="New Project"
-          subtitle="Upload project documents and configure your team"
-        />
-      }
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1200,
+      }}
     >
-      {/* Step indicator */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 28, maxWidth: 520 }}>
+      <div
+        onClick={handleClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(17, 24, 39, 0.38)',
+          backdropFilter: 'blur(2px)',
+        }}
+      />
+
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 24,
+        }}
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="New project setup"
+          style={{
+            width: 'min(860px, 100%)',
+            maxHeight: 'calc(100vh - 64px)',
+            background: 'var(--white)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-lg)',
+            boxShadow: '0 24px 64px rgba(0, 0, 0, 0.2)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              height: 58,
+              borderBottom: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0 18px',
+              flexShrink: 0,
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <h2 style={{ fontSize: 14, fontWeight: 600, color: 'var(--grey-900)', lineHeight: 1.2 }}>New Project</h2>
+              <span style={{ fontSize: 12, color: 'var(--grey-500)' }}>Upload project documents and configure your team</span>
+            </div>
+            <button
+              onClick={handleClose}
+              aria-label="Close dialog"
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 8,
+                border: '1px solid var(--border)',
+                background: 'transparent',
+                color: 'var(--grey-500)',
+                fontSize: 18,
+                lineHeight: 1,
+                cursor: 'pointer',
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          <div style={{ overflowY: 'auto', padding: 20 }}>
+            {/* Step indicator */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 20, maxWidth: 520 }}>
         {steps.map((s, i) => (
           <div key={s} style={{ display: 'flex', alignItems: 'center', flex: i < steps.length - 1 ? 1 : undefined }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -110,9 +185,9 @@ export default function NewProjectPage() {
             )}
           </div>
         ))}
-      </div>
+            </div>
 
-      <div style={{ maxWidth: 640 }}>
+            <div style={{ maxWidth: 760 }}>
         {/* Step 0 — Upload */}
         {step === 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -239,7 +314,10 @@ export default function NewProjectPage() {
             )}
           </div>
         )}
+            </div>
+          </div>
+        </div>
       </div>
-    </PageLayout>
+    </div>
   );
 }

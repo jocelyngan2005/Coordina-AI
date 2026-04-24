@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { NavLink, useParams, useLocation } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 
 /* ─── Icons (inline SVGs) ─── */
 const icons = {
@@ -131,12 +131,16 @@ function SectionLabel({ label, collapsed }: SectionLabelProps) {
   );
 }
 
+// Project icon
+const projectIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+  </svg>
+);
+
 export default function Navbar() {
   const [collapsed, setCollapsed] = useState(false);
-  const { id: projectId } = useParams();
   const location = useLocation();
-  const isOnProject = location.pathname.startsWith('/projects/') && !location.pathname.endsWith('/new');
-  const pid = projectId || 'proj-001';
 
   const sidebarStyle: React.CSSProperties = {
     width: collapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-w)',
@@ -150,6 +154,30 @@ export default function Navbar() {
     overflow: 'hidden',
     position: 'relative',
     zIndex: 10,
+  };
+
+  // The single persistent project entry
+  const PROJECT_ID = 'proj-001';
+  const PROJECT_NAME = 'Smart Campus Navigation';
+  const isProjectActive = location.pathname.startsWith(`/projects/${PROJECT_ID}`);
+
+  const projectEntryStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: collapsed ? '9px 0' : '9px 12px',
+    justifyContent: collapsed ? 'center' : 'flex-start',
+    borderRadius: 'var(--radius-md)',
+    color: isProjectActive ? 'var(--white)' : 'var(--grey-600)',
+    background: isProjectActive ? 'var(--grey-900)' : 'transparent',
+    transition: 'all var(--t-fast)',
+    fontSize: 13,
+    fontWeight: 500,
+    cursor: 'pointer',
+    border: 'none',
+    width: '100%',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
   };
 
   return (
@@ -177,17 +205,89 @@ export default function Navbar() {
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '8px' }}>
         <SectionLabel label="Main" collapsed={collapsed} />
         <NavItem to="/" icon={icons.dashboard} label="Dashboard" collapsed={collapsed} end />
-        <NavItem to="/projects/new" icon={icons.newProject} label="New Project" collapsed={collapsed} end />
 
-        {isOnProject && (
-          <>
-            <SectionLabel label="Current Project" collapsed={collapsed} />
-            <NavItem to={`/projects/${pid}`} icon={icons.workspace} label="Workspace" collapsed={collapsed} end />
-            <NavItem to={`/projects/${pid}/agents`} icon={icons.agents} label="Agent Pipeline" collapsed={collapsed} />
-            <NavItem to={`/projects/${pid}/risks`} icon={icons.risk} label="Risk & Alerts" collapsed={collapsed} />
-            <NavItem to={`/projects/${pid}/submission`} icon={icons.submission} label="Submission" collapsed={collapsed} />
-          </>
-        )}
+        <SectionLabel label="Projects" collapsed={collapsed} />
+
+        {/* Single persistent project link */}
+        <NavLink
+          to={`/projects/${PROJECT_ID}`}
+          end
+          title={collapsed ? PROJECT_NAME : undefined}
+          style={({ isActive }) => ({
+            ...projectEntryStyle,
+            background: isActive || isProjectActive ? 'var(--grey-900)' : 'transparent',
+            color:       isActive || isProjectActive ? 'var(--white)'   : 'var(--grey-600)',
+            textDecoration: 'none',
+          })}
+          onMouseEnter={e => {
+            if (!isProjectActive) {
+              (e.currentTarget as HTMLAnchorElement).style.background = 'var(--grey-100)';
+              (e.currentTarget as HTMLAnchorElement).style.color = 'var(--grey-900)';
+            }
+          }}
+          onMouseLeave={e => {
+            if (!isProjectActive) {
+              (e.currentTarget as HTMLAnchorElement).style.background = '';
+              (e.currentTarget as HTMLAnchorElement).style.color = 'var(--grey-600)';
+            }
+          }}
+        >
+          <span style={{ flexShrink: 0, display: 'flex' }}>{projectIcon}</span>
+          {!collapsed && (
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {PROJECT_NAME}
+              </span>
+              {/* Active dot */}
+              <div style={{
+                width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
+                background: '#22c55e',
+                boxShadow: '0 0 0 2px rgba(34,197,94,0.25)',
+              }} title="Active" />
+            </div>
+          )}
+        </NavLink>
+
+        <NavLink
+          to="/projects/new"
+          state={{ backgroundLocation: location }}
+          end
+          title={collapsed ? 'New Project' : undefined}
+          style={({ isActive }) => ({
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: collapsed ? '9px 0' : '9px 12px',
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            borderRadius: 'var(--radius-md)',
+            color: isActive ? 'var(--grey-700)' : 'var(--grey-500)',
+            background: isActive ? 'var(--grey-100)' : 'transparent',
+            transition: 'all var(--t-fast)',
+            fontSize: 13,
+            fontWeight: 500,
+            width: '100%',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textDecoration: 'none',
+          })}
+          onMouseEnter={e => {
+            const el = e.currentTarget as HTMLAnchorElement;
+            if (!el.getAttribute('aria-current')) {
+              el.style.background = 'var(--grey-100)';
+              el.style.color = 'var(--grey-700)';
+            }
+          }}
+          onMouseLeave={e => {
+            const el = e.currentTarget as HTMLAnchorElement;
+            if (!el.getAttribute('aria-current')) {
+              el.style.background = '';
+              el.style.color = 'var(--grey-500)';
+            }
+          }}
+        >
+          <span style={{ flexShrink: 0, display: 'flex' }}>{icons.newProject}</span>
+          {!collapsed && <span>New Project</span>}
+        </NavLink>
       </div>
 
       {/* Collapse Toggle */}
@@ -206,6 +306,9 @@ export default function Navbar() {
             color: 'var(--grey-500)',
             fontSize: 12,
             transition: 'all var(--t-fast)',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
           }}
           onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--grey-100)'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = ''; }}
