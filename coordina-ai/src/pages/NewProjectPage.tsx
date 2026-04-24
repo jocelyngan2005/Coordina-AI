@@ -1,8 +1,6 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/ui/Button';
-import { extractTextFromImage, extractTextFromPdf, isOcrSupported, isPdfFile } from '../services/ocrService';
-import type { OcrProgress } from '../services/ocrService';
 
 type DocType = 'brief' | 'rubric' | 'transcript' | 'chat_log';
 
@@ -10,14 +8,6 @@ interface UploadedFile {
   name: string;
   type: DocType;
   size: string;
-  /** OCR state — only populated for image files */
-  ocr?: {
-    status: 'idle' | 'running' | 'done' | 'error';
-    progress: number;       // 0–1
-    progressLabel: string;
-    text: string;
-    expanded: boolean;
-  };
 }
 
 const docTypeLabels: Record<DocType, string> = {
@@ -60,67 +50,6 @@ export default function NewProjectPage() {
     'Project state initialised ✓',
   ];
 
-  // ─── OCR helpers ────────────────────────────────────────────────────────────
-
-  function updateFileOcr(index: number, patch: Partial<NonNullable<UploadedFile['ocr']>>) {
-    setFiles(prev =>
-      prev.map((f, i) =>
-        i !== index ? f : { ...f, ocr: { ...f.ocr!, ...patch } },
-      ),
-    );
-  }
-
-  async function runOcr(file: File, index: number) {
-    // Initialise OCR state
-    setFiles(prev =>
-      prev.map((f, i) =>
-        i !== index
-          ? f
-          : {
-              ...f,
-              ocr: {
-                status: 'running',
-                progress: 0,
-                progressLabel: isPdfFile(file) ? 'Rendering PDF pages…' : 'Initialising…',
-                text: '',
-                expanded: false,
-              },
-            },
-      ),
-    );
-
-    try {
-      // PDFs: render each page to JPEG via PDF.js, then OCR each page image.
-      // Images: feed directly to Tesseract.
-      const extractor = isPdfFile(file) ? extractTextFromPdf : extractTextFromImage;
-
-      const text = await extractor(file, (p: OcrProgress) => {
-        // Strip verbose page-tracking prefix so the label stays concise.
-        const label = p.status
-          .replace(/^rendering_page_(\d+)_of_(\d+)__?/, 'Rendering p.$1/$2 — ')
-          .replace(/^ocr_page_(\d+)_of_(\d+)__?/, 'OCR p.$1/$2 — ')
-          .replace(/_/g, ' ');
-        updateFileOcr(index, {
-          progress: p.progress,
-          progressLabel: label,
-        });
-      });
-
-      updateFileOcr(index, {
-        status: 'done',
-        progress: 1,
-        progressLabel: 'Complete',
-        text,
-        expanded: text.length > 0,
-      });
-    } catch {
-      updateFileOcr(index, {
-        status: 'error',
-        progressLabel: 'OCR failed',
-      });
-    }
-  }
-
   // ─── File ingestion ──────────────────────────────────────────────────────────
 
   function addFiles(rawFiles: FileList | null) {
@@ -132,21 +61,11 @@ export default function NewProjectPage() {
     if (incoming.length === 0) return;
 
     setFiles(prev => {
-      const startIndex = prev.length;
       const newEntries: UploadedFile[] = incoming.map(f => ({
         name: f.name,
         type: 'brief' as DocType,
         size: `${Math.round(f.size / 1024)} KB`,
-        ...(isOcrSupported(f) ? { ocr: { status: 'idle' as const, progress: 0, progressLabel: '', text: '', expanded: false } } : {}),
       }));
-
-      // Kick off OCR for image files (after state is committed)
-      incoming.forEach((f, i) => {
-        if (isOcrSupported(f)) {
-          // Use setTimeout so the state update above has flushed
-          setTimeout(() => runOcr(f, startIndex + i), 0);
-        }
-      });
 
       return [...prev, ...newEntries];
     });
@@ -351,88 +270,6 @@ export default function NewProjectPage() {
                                 >×</button>
                               </div>
                             </div>
-
-                            {/* OCR panel — only for image files */}
-                            {f.ocr && (
-                              <div style={{ marginBottom: 4 }}>
-
-                                {/* Progress bar (while running) */}
-                                {f.ocr.status === 'running' && (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 6 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                      <span style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'capitalize' }}>
-                                        🔍 OCR: {f.ocr.progressLabel}
-                                      </span>
-                                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                                        {Math.round(f.ocr.progress * 100)}%
-                                      </span>
-                                    </div>
-                                    <div style={{ height: 4, borderRadius: 4, background: 'var(--grey-100)', overflow: 'hidden' }}>
-                                      <div style={{
-                                        height: '100%',
-                                        width: `${f.ocr.progress * 100}%`,
-                                        background: 'var(--grey-900)',
-                                        borderRadius: 4,
-                                        transition: 'width 0.3s ease',
-                                      }} />
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Error badge */}
-                                {f.ocr.status === 'error' && (
-                                  <span style={{ fontSize: 11, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 4, padding: '2px 6px' }}>
-                                    ✗ OCR failed
-                                  </span>
-                                )}
-
-                                {/* Collapsible extracted text */}
-                                {f.ocr.status === 'done' && (
-                                  <div>
-                                    <button
-                                      onClick={() => updateFileOcr(i, { expanded: !f.ocr!.expanded })}
-                                      style={{
-                                        display: 'flex', alignItems: 'center', gap: 6,
-                                        fontSize: 11, fontWeight: 500,
-                                        color: 'var(--grey-600)',
-                                        background: 'none', border: 'none', cursor: 'pointer',
-                                        padding: '2px 0', marginBottom: 4,
-                                      }}
-                                    >
-                                      <span style={{
-                                        display: 'inline-block',
-                                        transform: f.ocr.expanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                                        transition: 'transform 0.2s',
-                                        fontSize: 10,
-                                      }}>▶</span>
-                                      {f.ocr.expanded ? 'Hide' : 'Show'} extracted text
-                                      {f.ocr.text.length === 0 && (
-                                        <span style={{ color: 'var(--grey-400)', fontWeight: 400 }}>(no text found)</span>
-                                      )}
-                                    </button>
-
-                                    {f.ocr.expanded && (
-                                      <pre style={{
-                                        fontSize: 11,
-                                        lineHeight: 1.6,
-                                        color: 'var(--grey-700)',
-                                        background: 'var(--grey-50)',
-                                        border: '1px solid var(--border)',
-                                        borderRadius: 'var(--radius-md)',
-                                        padding: '10px 12px',
-                                        whiteSpace: 'pre-wrap',
-                                        wordBreak: 'break-word',
-                                        maxHeight: 180,
-                                        overflowY: 'auto',
-                                        margin: 0,
-                                      }}>
-                                        {f.ocr.text || '(no text detected)'}
-                                      </pre>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            )}
                           </div>
                         ))}
                       </div>
