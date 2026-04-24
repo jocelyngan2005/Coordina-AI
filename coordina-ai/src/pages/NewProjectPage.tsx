@@ -119,7 +119,9 @@ export default function NewProjectPage() {
           aria-modal="true"
           aria-label="New project setup"
           style={{
-            width: 'min(860px, 100%)',
+            width: 'fit-content',
+            minWidth: 640,
+            maxWidth: 'min(760px, calc(100vw - 48px))',
             maxHeight: 'calc(100vh - 64px)',
             background: 'var(--white)',
             border: '1px solid var(--border)',
@@ -132,18 +134,17 @@ export default function NewProjectPage() {
         >
           <div
             style={{
-              height: 58,
               borderBottom: '1px solid var(--border)',
               display: 'flex',
-              alignItems: 'center',
+              alignItems: 'flex-start',
               justifyContent: 'space-between',
-              padding: '0 18px',
+              padding: '20px 20px 16px',
               flexShrink: 0,
             }}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <h2 style={{ fontSize: 14, fontWeight: 600, color: 'var(--grey-900)', lineHeight: 1.2 }}>New Project</h2>
-              <span style={{ fontSize: 12, color: 'var(--grey-500)' }}>Upload project documents and configure your team</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <h2 style={{ fontSize: 22, fontWeight: 400, color: 'var(--grey-900)', lineHeight: 1.2 }}>New Project</h2>
+              <span style={{ fontSize: 13, color: 'var(--text-3)' }}>Upload documents and configure your team</span>
             </div>
             <button
               onClick={handleClose}
@@ -152,10 +153,10 @@ export default function NewProjectPage() {
                 width: 30,
                 height: 30,
                 borderRadius: 8,
-                border: '1px solid var(--border)',
+                border: 'none',
                 background: 'transparent',
                 color: 'var(--grey-500)',
-                fontSize: 18,
+                fontSize: 20,
                 lineHeight: 1,
                 cursor: 'pointer',
               }}
@@ -166,7 +167,7 @@ export default function NewProjectPage() {
 
           <div style={{ overflowY: 'auto', padding: 20 }}>
             {/* Step indicator */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 20, maxWidth: 520 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 20, justifyContent: 'center' }}>
         {steps.map((s, i) => (
           <div key={s} style={{ display: 'flex', alignItems: 'center', flex: i < steps.length - 1 ? 1 : undefined }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
