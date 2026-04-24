@@ -17,3 +17,4 @@ pytest-asyncio==0.24.0
 pytest-httpx==0.32.0
 loguru==0.7.2
 tenacity==9.0.0
+locust==2.43.4
