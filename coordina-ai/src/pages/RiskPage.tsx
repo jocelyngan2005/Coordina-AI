@@ -1,5 +1,4 @@
 import PageLayout from '../components/layout/PageLayout';
-import TopBar from '../components/layout/TopBar';
 import { MOCK_RISKS, MOCK_PROJECT } from '../data/mockData';
 import type { RiskSeverity, RiskType } from '../types';
 
@@ -56,9 +55,12 @@ export default function RiskPage() {
   };
 
   return (
-    <PageLayout
-      topBar={<TopBar title="Risk & Alerts" subtitle="AI-detected risks, inactivity flags, and deadline predictions" />}
-    >
+    <PageLayout>
+      {/* Page Header */}
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--grey-900)', lineHeight: 1.2, marginBottom: 4 }}>Risk &amp; Alerts</h1>
+        <p style={{ fontSize: 13, color: 'var(--text-3)' }}>AI-detected risks, inactivity flags, and deadline predictions</p>
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 16, marginBottom: 16 }}>
         {/* Risk gauge */}
         <div style={{ ...card, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>

@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../components/layout/PageLayout';
-import TopBar from '../components/layout/TopBar';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import { MOCK_PROJECT } from '../data/mockData';
@@ -43,19 +42,15 @@ export default function DashboardPage() {
   const activeTasks = p.tasks.filter(t => t.status === 'in_progress').length;
 
   return (
-    <PageLayout
-      topBar={
-        <TopBar
-          title="Dashboard"
-          subtitle="Overview of your active projects and team"
-          actions={
-            <Button variant="primary" size="sm" onClick={() => navigate('/projects/new')}>
-              + New Project
-            </Button>
-          }
-        />
-      }
-    >
+    <PageLayout>
+      {/* Page Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <div>
+          <h1 style={{ fontSize: 28, fontWeight: 400, color: 'var(--grey-900)', lineHeight: 1.2, marginBottom: 4 }}>Dashboard</h1>
+          <p style={{ fontSize: 13, color: 'var(--text-3)' }}>Overview of your active projects and team</p>
+        </div>
+        <Button variant="primary" size="sm" onClick={() => navigate('/projects/new')}>+ New Project</Button>
+      </div>
       {/* Stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
         <StatCard label="Active Projects" value={1} sub="1 approaching deadline" />
@@ -109,7 +104,7 @@ export default function DashboardPage() {
         {[
           { time: '2 min ago', text: 'Risk Detection Agent flagged 28h inactivity for Sam Okonkwo', who: 'AI' },
           { time: '10 min ago', text: 'Deadline risk recalculated — REST API task at risk', who: 'AI' },
-          { time: '1 hr ago',  text: 'Priya Sharma pushed model training checkpoint', who: 'PS' },
+          { time: '1 hr ago', text: 'Priya Sharma pushed model training checkpoint', who: 'PS' },
           { time: '3 hrs ago', text: 'Mei Tanaka submitted usability test report for review', who: 'MT' },
           { time: '5 hrs ago', text: 'Alex Chen updated system architecture document', who: 'AC' },
         ].map((item, i) => (

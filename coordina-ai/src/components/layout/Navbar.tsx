@@ -145,9 +145,8 @@ export default function Navbar() {
   const sidebarStyle: React.CSSProperties = {
     width: collapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-w)',
     flexShrink: 0,
-    height: '100vh',
-    borderRight: '1px solid var(--border)',
-    background: 'var(--white)',
+    height: '100%',
+    background: 'transparent',
     display: 'flex',
     flexDirection: 'column',
     transition: 'width var(--t-base)',
@@ -189,7 +188,6 @@ export default function Navbar() {
         alignItems: 'center',
         padding: collapsed ? '0' : '0 16px',
         justifyContent: collapsed ? 'center' : 'flex-start',
-        borderBottom: '1px solid var(--border)',
         gap: 8,
         flexShrink: 0,
       }}>
@@ -216,7 +214,7 @@ export default function Navbar() {
           style={({ isActive }) => ({
             ...projectEntryStyle,
             background: isActive || isProjectActive ? 'var(--grey-900)' : 'transparent',
-            color:       isActive || isProjectActive ? 'var(--white)'   : 'var(--grey-600)',
+            color: isActive || isProjectActive ? 'var(--white)' : 'var(--grey-600)',
             textDecoration: 'none',
           })}
           onMouseEnter={e => {
@@ -291,7 +289,7 @@ export default function Navbar() {
       </div>
 
       {/* Collapse Toggle */}
-      <div style={{ borderTop: '1px solid var(--border)', padding: '8px' }}>
+      <div style={{ padding: '8px' }}>
         <button
           onClick={() => setCollapsed(c => !c)}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}

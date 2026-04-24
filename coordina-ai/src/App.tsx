@@ -13,18 +13,20 @@ function AppRoutes() {
   return (
     <>
       <Navbar />
-      <Routes location={backgroundLocation || location}>
-        <Route path="/"                   element={<DashboardPage />} />
-        <Route path="/projects/new"       element={<NewProjectPage />} />
-        <Route path="/projects/:id"       element={<ProjectWorkspacePage />} />
-        <Route path="/projects/:id/risks" element={<RiskPage />} />
-      </Routes>
-
-      {backgroundLocation && (
-        <Routes>
+      <div className="app-shell" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <Routes location={backgroundLocation || location}>
+          <Route path="/" element={<DashboardPage />} />
           <Route path="/projects/new" element={<NewProjectPage />} />
+          <Route path="/projects/:id" element={<ProjectWorkspacePage />} />
+          <Route path="/projects/:id/risks" element={<RiskPage />} />
         </Routes>
-      )}
+
+        {backgroundLocation && (
+          <Routes>
+            <Route path="/projects/new" element={<NewProjectPage />} />
+          </Routes>
+        )}
+      </div>
     </>
   );
 }
