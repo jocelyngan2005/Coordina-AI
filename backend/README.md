@@ -23,7 +23,7 @@ Autonomous AI Teammate & Workflow Orchestrator
 
 ```bash
 # 1. Clone and install
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && .venv\Scripts\activate
 pip install -r requirements.txt
 
 # 2. Configure environment

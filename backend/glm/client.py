@@ -35,7 +35,7 @@ class GLMClient:
         messages: list[dict],
         system_prompt: str | None = None,
         temperature: float = 0.3,
-        max_tokens: int = 2048,
+        max_tokens: int = 4096,
     ) -> str:
         """
         Send a chat request to the GLM model.
@@ -54,8 +54,9 @@ class GLMClient:
         }
 
         logger.debug(f"GLM request: model={self.model}, messages={len(payload_messages)}")
+        logger.debug(f"GLM payload: {payload}")
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=120.0) as client:
             try:
                 response = await client.post(
                     f"{self.base_url}/chat/completions",
@@ -64,16 +65,31 @@ class GLMClient:
                 )
                 response.raise_for_status()
                 data = response.json()
-                content = data["choices"][0]["message"]["content"]
+                logger.debug(f"GLM raw response: {data}")
+                
+                # Extract content safely
+                try:
+                    content = data["choices"][0]["message"]["content"]
+                except (KeyError, IndexError, TypeError) as e:
+                    logger.error(f"GLM response structure invalid: {e}. Full response: {data}")
+                    raise GLMReasoningError(f"Invalid response structure from GLM: {e}") from e
+                
+                # Handle None content
+                if content is None:
+                    logger.error(f"GLM returned None content. Full response: {data}")
+                    raise GLMReasoningError("GLM returned null content — check model settings or prompt")
+                
                 logger.debug(f"GLM response received: {len(content)} chars")
                 return content
 
             except httpx.HTTPStatusError as e:
                 logger.error(f"GLM API HTTP error: {e.response.status_code} — {e.response.text}")
                 raise
+            except GLMReasoningError:
+                raise
             except Exception as e:
-                logger.error(f"GLM API unexpected error: {e}")
-                raise GLMReasoningError(f"GLM call failed: {str(e)}") from e
+                logger.error(f"GLM API unexpected error: {type(e).__name__}: {str(e)}")
+                raise GLMReasoningError(f"GLM call failed: {type(e).__name__}: {str(e)}") from e
 
     async def chat_stream(
         self,

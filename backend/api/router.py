@@ -1,19 +1,23 @@
-"""models/workflow_event.py"""
+"""
+api/router.py
 
-import uuid
-from datetime import datetime, timezone
-from sqlalchemy import String, DateTime, JSON, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from core.database import Base
+Aggregates all API route modules into a single APIRouter.
+This router is included in main.py with the /api prefix.
+"""
 
+from fastapi import APIRouter
 
-class WorkflowEvent(Base):
-    __tablename__ = "workflow_events"
+from api.routes import workflow, projects, tasks, teams, documents, analytics, agents
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), nullable=False)
-    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
-    payload: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+api_router = APIRouter()
 
-    project: Mapped["Project"] = relationship(back_populates="workflow_events")
+# Include all route modules
+api_router.include_router(workflow.router, prefix="/workflow", tags=["workflow"])
+api_router.include_router(projects.router, prefix="/projects", tags=["projects"])
+api_router.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
+api_router.include_router(teams.router, prefix="/teams", tags=["teams"])
+api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
+api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+api_router.include_router(agents.router, prefix="/agents", tags=["agents"])
+
+__all__ = ["api_router"]

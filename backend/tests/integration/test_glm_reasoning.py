@@ -8,6 +8,7 @@ import json
 from unittest.mock import AsyncMock, patch, MagicMock
 
 from glm.reasoning_engine import ReasoningEngine
+from glm.client import glm_client
 from core.exceptions import GLMReasoningError
 
 
@@ -26,7 +27,7 @@ def engine():
 
 @pytest.mark.asyncio
 async def test_reason_returns_parsed_dict(engine):
-    with patch("glm.reasoning_engine.glm_client.chat", new=AsyncMock(return_value=VALID_JSON_RESPONSE)):
+    with patch.object(glm_client, "chat", new=AsyncMock(return_value=VALID_JSON_RESPONSE)):
         result = await engine.reason(
             prompt_template="instruction_analysis",
             context={"document_text": "Build a web app", "document_type": "brief"},
@@ -38,7 +39,7 @@ async def test_reason_returns_parsed_dict(engine):
 
 @pytest.mark.asyncio
 async def test_reason_strips_markdown_fences(engine):
-    with patch("glm.reasoning_engine.glm_client.chat", new=AsyncMock(return_value=FENCED_JSON_RESPONSE)):
+    with patch.object(glm_client, "chat", new=AsyncMock(return_value=FENCED_JSON_RESPONSE)):
         result = await engine.reason(
             prompt_template="instruction_analysis",
             context={"document_text": "Brief", "document_type": "brief"},
@@ -51,7 +52,7 @@ async def test_reason_strips_markdown_fences(engine):
 @pytest.mark.asyncio
 async def test_reason_raises_on_invalid_json(engine):
     bad_response = "This is not JSON at all."
-    with patch("glm.reasoning_engine.glm_client.chat", new=AsyncMock(return_value=bad_response)):
+    with patch.object(glm_client, "chat", new=AsyncMock(return_value=bad_response)):
         with pytest.raises(GLMReasoningError):
             await engine.reason(
                 prompt_template="instruction_analysis",
@@ -63,7 +64,7 @@ async def test_reason_raises_on_invalid_json(engine):
 @pytest.mark.asyncio
 async def test_reason_returns_raw_string_when_not_json(engine):
     raw = "This is a free-form response."
-    with patch("glm.reasoning_engine.glm_client.chat", new=AsyncMock(return_value=raw)):
+    with patch.object(glm_client, "chat", new=AsyncMock(return_value=raw)):
         result = await engine.reason(
             prompt_template="instruction_analysis",
             context={"text": "hello"},
@@ -84,7 +85,7 @@ async def test_reason_passes_conversation_history(engine):
         captured["messages"] = messages
         return VALID_JSON_RESPONSE
 
-    with patch("glm.reasoning_engine.glm_client.chat", new=capture_chat):
+    with patch.object(glm_client, "chat", new=capture_chat):
         await engine.reason(
             prompt_template="planning",
             context={"goals": []},
