@@ -24,6 +24,10 @@ from agents import (
     RiskDetectionAgent,
     SubmissionReadinessAgent,
 )
+from edge_cases.ambiguity_resolver import ambiguity_resolver
+from edge_cases.missing_data_handler import missing_data_handler
+from edge_cases.inactivity_detector import inactivity_detector
+from edge_cases.deadline_recovery import DeadlineRecovery
 from orchestrator.state_manager import StateManager
 from orchestrator.event_bus import EventBus, WorkflowEvent
 from memory.decision_log import DecisionLogger
@@ -41,6 +45,7 @@ class WorkflowEngine:
         self.state_manager = StateManager()
         self.event_bus = EventBus()
         self.decision_logger = DecisionLogger()
+        self.deadline_recovery = DeadlineRecovery()
 
         # Agent registry
         self._agents = {
@@ -55,7 +60,7 @@ class WorkflowEngine:
     #  Stage 1+2: Ingest & Analyse                                         #
     # ------------------------------------------------------------------ #
     async def run_analysis(self, project_id: str, document_text: str, document_type: str) -> dict:
-        """Parse a brief/rubric and store structured goals in project state."""
+        """Parse a brief/rubric and store structured goals in project state. Handle ambiguities."""
         state = await self.state_manager.get(project_id)
 
         context = {
@@ -67,24 +72,55 @@ class WorkflowEngine:
         output = await self._agents["instruction_analysis"].execute(context)
         self._raise_on_agent_error(output, "instruction_analysis")
 
+        # Extract analysis results
+        result = output["result"]
+        ambiguities = result.get("ambiguities", [])
+        confidence_score = result.get("confidence_score", 1.0)
+
+        # EDGE CASE: Handle ambiguities or low confidence
+        ambiguity_resolution = None
+        if ambiguities or confidence_score < 0.6:
+            logger.warning(
+                f"[WorkflowEngine] Low confidence ({confidence_score}) or ambiguities detected. Running resolver."
+            )
+            ambiguity_resolution = await ambiguity_resolver.resolve(
+                project_id=project_id,
+                ambiguities=ambiguities,
+                document_text=document_text,
+            )
+            result["ambiguity_resolution"] = ambiguity_resolution
+            result["confidence_score"] = confidence_score
+
+            await self.event_bus.publish(WorkflowEvent(
+                project_id=project_id,
+                event_type="ambiguities_detected",
+                payload={
+                    "ambiguity_count": len(ambiguities),
+                    "confidence_score": confidence_score,
+                    "can_proceed": ambiguity_resolution.get("can_proceed", True),
+                    "clarification_questions": ambiguity_resolution.get("clarification_questions", []),
+                },
+            ))
+
         # Persist goals into project state
-        state["structured_goals"] = output["result"].get("structured_goals", [])
-        state["rubric_criteria"] = output["result"].get("grading_priorities", [])
-        state["ambiguities"] = output["result"].get("ambiguities", [])
+        state["structured_goals"] = result.get("structured_goals", [])
+        state["rubric_criteria"] = result.get("grading_priorities", [])
+        state["ambiguities"] = ambiguities
+        state["ambiguity_resolution"] = ambiguity_resolution
         state["workflow_stage"] = "analysed"
         await self.state_manager.save(project_id, state)
 
         await self.decision_logger.log(
             project_id=project_id,
             agent="instruction_analysis",
-            decision_summary="Extracted structured goals from project brief.",
-            output=output["result"],
+            decision_summary=f"Extracted {len(result.get('structured_goals', []))} goals. Confidence: {confidence_score:.1%}",
+            output=result,
         )
 
         await self.event_bus.publish(WorkflowEvent(
             project_id=project_id,
             event_type="analysis_complete",
-            payload=output["result"],
+            payload=result,
         ))
 
         return output
@@ -182,16 +218,57 @@ class WorkflowEngine:
         output = await self._agents["risk_detection"].execute(context)
         self._raise_on_agent_error(output, "risk_detection")
 
-        state["last_risk_report"] = output["result"]
+        risk_report = output["result"]
+
+        # EDGE CASE: Detect inactive members and trigger redistribution
+        if state.get("members"):
+            inactivity_report = await inactivity_detector.scan(
+                project_id=project_id,
+                members=state.get("members", []),
+            )
+            risk_report["inactivity_report"] = inactivity_report
+
+            if inactivity_report.get("inactive_members"):
+                logger.warning(
+                    f"[WorkflowEngine] {len(inactivity_report['inactive_members'])} inactive members detected"
+                )
+                await self.event_bus.publish(WorkflowEvent(
+                    project_id=project_id,
+                    event_type="inactivity_detected",
+                    payload=inactivity_report,
+                ))
+
+        # EDGE CASE: Deadline recovery if failure probability exceeds threshold
+        if risk_report.get("deadline_failure_probability", 0) > 0.5:
+            logger.warning(
+                f"[WorkflowEngine] Deadline failure probability {risk_report['deadline_failure_probability']:.0%} "
+                f"exceeds threshold. Generating recovery plan."
+            )
+            recovery_plan = await self.deadline_recovery.generate_recovery_plan(
+                project_id=project_id,
+                tasks=state.get("tasks", []),
+                deadline_date=state.get("deadline_date", ""),
+                current_date=datetime.now(timezone.utc).date().isoformat(),
+                risk_report=risk_report,
+            )
+            risk_report["recovery_plan"] = recovery_plan
+
+            await self.event_bus.publish(WorkflowEvent(
+                project_id=project_id,
+                event_type="recovery_plan_generated",
+                payload=recovery_plan,
+            ))
+
+        state["last_risk_report"] = risk_report
         await self.state_manager.save(project_id, state)
 
-        # If auto recovery triggered, replan
-        if output["result"].get("auto_recovery_triggered"):
+        # If auto recovery triggered, replanning is needed
+        if risk_report.get("auto_recovery_triggered"):
             logger.warning(f"[WorkflowEngine] Auto-recovery triggered for project {project_id}")
             await self.event_bus.publish(WorkflowEvent(
                 project_id=project_id,
                 event_type="recovery_triggered",
-                payload=output["result"],
+                payload=risk_report,
             ))
 
         return output
