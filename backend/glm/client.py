@@ -35,7 +35,7 @@ class GLMClient:
         messages: list[dict],
         system_prompt: str | None = None,
         temperature: float = 0.3,
-        max_tokens: int = 2048,
+        max_tokens: int = 4096,
     ) -> str:
         """
         Send a chat request to the GLM model.
