@@ -1,7 +1,7 @@
 """
 agents/instruction_analysis_agent.py
 
-Parses project briefs and rubrics.
+Parses project briefs, rubrics, meeting transcripts, and chat logs.
 Converts unstructured document text → structured goals + grading priorities.
 """
 
@@ -16,8 +16,8 @@ class InstructionAnalysisAgent(BaseAgent):
     async def _run(self, context: dict[str, Any]) -> dict[str, Any]:
         """
         Expected context keys:
-            - document_text: str         Raw text from parsed brief/rubric
-            - document_type: str         "brief" | "rubric" | "combined"
+            - document_text: str         Raw text from parsed document
+            - document_type: str         "brief" | "rubric" | "meeting_transcript" | "chat_logs"
             - project_id: str
         """
         result = await self._reason(context)
