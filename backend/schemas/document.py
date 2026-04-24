@@ -8,7 +8,7 @@ from typing import Optional
 class DocumentCreate(BaseModel):
     project_id: str
     file_name: str
-    document_type: str  # "brief" | "rubric" | "transcript" | "other"
+    document_type: str  # "brief" | "rubric" | "meeting_transcript" | "chat_logs"
     mime_type: str
 
 
