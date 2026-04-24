@@ -383,7 +383,6 @@ function AccountabilityAndTasks({ members }: { members: typeof MOCK_PROJECT['tea
           )}
           {visibleTasks.map(task => {
             const m = memberMap[task.assigneeId];
-            const sc = statusConfig[task.status];
             const conf = task.aiConfidence ?? 0;
             return (
               <div
@@ -595,83 +594,131 @@ function MyTasksCard() {
 
 /* ─── Notification Bell (inline) ─── */
 const severityColor: Record<string, string> = {
-  high: '#ef4444', medium: '#f59e0b', low: '#22c55e',
+  high: '#7d2027', medium: '#ce9042', low: '#274133',
+};
+const severityBg: Record<string, string> = {
+  high: '#f9e8e9', medium: '#fdf3e3', low: '#e6efeb',
 };
 const typeIcon: Record<string, string> = {
   inactivity: '👤', deadline: '⏰', ambiguity: '❓', missing_artifact: '📄',
 };
+type AlertAction = { label: string; variant: 'primary' | 'ghost' };
+const actionsByType: Record<string, AlertAction[]> = {
+  inactivity: [{ label: 'Send Reminder', variant: 'primary' }, { label: 'Reassign Task', variant: 'ghost' }],
+  deadline: [{ label: 'Adjust Timeline', variant: 'primary' }, { label: 'Escalate', variant: 'ghost' }],
+  ambiguity: [{ label: 'Request Clarification', variant: 'primary' }, { label: 'Flag for Review', variant: 'ghost' }],
+  missing_artifact: [{ label: 'Upload Artifact', variant: 'primary' }, { label: 'Assign Owner', variant: 'ghost' }],
+};
 function NotificationBell({ notifications }: { notifications: RiskAlert[] }) {
   const [open, setOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
+
+  function handleAction(label: string) {
+    setToast(`"${label}" triggered`);
+    setTimeout(() => setToast(null), 2500);
+  }
+
+  const btnBase: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    padding: '3px 9px', borderRadius: 5, fontSize: 10, fontWeight: 600,
+    cursor: 'pointer', border: '1px solid transparent', transition: 'opacity .15s',
+    background: 'none',
+  };
+  const btnPrimary: React.CSSProperties = { ...btnBase, background: 'var(--grey-900)', color: 'var(--white)', borderColor: 'var(--grey-900)' };
+  const btnGhost: React.CSSProperties = { ...btnBase, background: 'transparent', color: 'var(--grey-700)', borderColor: 'var(--border)' };
+
   const hasAlerts = notifications.length > 0;
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          position: 'relative', width: 34, height: 34,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: open ? 'var(--grey-100)' : 'transparent',
-          border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer',
-          transition: 'background 0.15s',
-        }}
-        title="Risk alerts"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--grey-700)" strokeWidth="2">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-        </svg>
-        {hasAlerts && (
-          <span style={{
-            position: 'absolute', top: -4, right: -4,
-            minWidth: 16, height: 16, borderRadius: 99,
-            background: '#ef4444', color: '#fff',
-            fontSize: 9, fontWeight: 700,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '0 3px', border: '2px solid var(--white)',
-          }}>{notifications.length}</span>
-        )}
-      </button>
-      {open && (
+    <>
+      {/* Toast */}
+      {toast && (
         <div style={{
-          position: 'absolute', right: 0, top: 'calc(100% + 8px)',
-          width: 340, maxHeight: 420, overflowY: 'auto',
-          background: 'var(--white)', border: '1px solid var(--border)',
-          borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 1000,
-        }}>
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--grey-900)' }}>Intervention &amp; Risk</span>
-            {hasAlerts && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#fef2f2', color: '#b91c1c' }}>{notifications.length} active</span>}
-          </div>
-          {notifications.length === 0 ? (
-            <div style={{ padding: '24px 16px', textAlign: 'center' }}><p style={{ fontSize: 13, color: 'var(--text-3)' }}>✅ No active alerts</p></div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {notifications.map((risk, i) => (
-                <div key={risk.id} style={{ padding: '12px 16px', borderBottom: i < notifications.length - 1 ? '1px solid var(--grey-100)' : 'none' }}>
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{typeIcon[risk.type]}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                        <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--grey-900)' }}>{risk.message}</p>
-                        <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, flexShrink: 0, background: risk.severity === 'high' ? '#fef2f2' : risk.severity === 'medium' ? '#fffbeb' : '#f0fdf4', color: severityColor[risk.severity] }}>{risk.severity}</span>
+          position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
+          background: 'var(--grey-900)', color: 'var(--white)',
+          padding: '9px 16px', borderRadius: 8, fontSize: 12, fontWeight: 500,
+          boxShadow: '0 4px 16px rgba(0,0,0,.18)', pointerEvents: 'none',
+        }}>{toast}</div>
+      )}
+      <div ref={ref} style={{ position: 'relative' }}>
+        <button
+          onClick={() => setOpen(o => !o)}
+          style={{
+            position: 'relative', width: 34, height: 34,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: open ? 'var(--grey-100)' : 'transparent',
+            border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer',
+            transition: 'background 0.15s',
+          }}
+          title="Risk alerts"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--grey-700)" strokeWidth="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
+          {hasAlerts && (
+            <span style={{
+              position: 'absolute', top: -4, right: -4,
+              minWidth: 16, height: 16, borderRadius: 99,
+              background: 'var(--grey-900)', color: 'var(--white)',
+              fontSize: 9, fontWeight: 700,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '0 3px', border: '2px solid var(--white)',
+            }}>{notifications.length}</span>
+          )}
+        </button>
+        {open && (
+          <div style={{
+            position: 'absolute', right: 0, top: 'calc(100% + 8px)',
+            width: 360, maxHeight: 460, overflowY: 'auto',
+            background: 'var(--white)', border: '1px solid var(--border)',
+            borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 1000,
+          }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--grey-900)' }}>Intervention &amp; Risk</span>
+              {hasAlerts && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'var(--grey-150)', color: 'var(--grey-800)' }}>{notifications.length} active</span>}
+            </div>
+            {notifications.length === 0 ? (
+              <div style={{ padding: '24px 16px', textAlign: 'center' }}><p style={{ fontSize: 13, color: 'var(--text-3)' }}>No active alerts</p></div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {notifications.map((risk, i) => (
+                  <div key={risk.id} style={{ padding: '12px 16px', borderBottom: i < notifications.length - 1 ? '1px solid var(--grey-100)' : 'none' }}>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>{typeIcon[risk.type]}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                          <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--grey-900)' }}>{risk.message}</p>
+                          <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, flexShrink: 0, background: severityBg[risk.severity], color: severityColor[risk.severity] }}>{risk.severity}</span>
+                        </div>
+                        <p style={{ fontSize: 11, color: 'var(--grey-600)', lineHeight: 1.4, marginBottom: 7 }}>{risk.detail}</p>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 4 }}>
+                          {(actionsByType[risk.type] ?? []).map(btn => (
+                            <button
+                              key={btn.label}
+                              style={{ ...(btn.variant === 'primary' ? btnPrimary : btnGhost), justifyContent: 'center', width: '100%' }}
+                              onClick={() => handleAction(btn.label)}
+                              onMouseEnter={e => (e.currentTarget.style.opacity = '0.75')}
+                              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                            >{btn.label}</button>
+                          ))}
+                        </div>
+                        <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{risk.timestamp}</span>
                       </div>
-                      <p style={{ fontSize: 11, color: 'var(--grey-600)', lineHeight: 1.4, marginBottom: 3 }}>{risk.detail}</p>
-                      <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{risk.timestamp}</span>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
