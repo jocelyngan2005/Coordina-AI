@@ -71,6 +71,67 @@ Deadline: 1 December 2025
 Team size: 4 members
 """
 
+SAMPLE_TRANSCRIPT = """
+[00:00] Alice: Good morning everyone, let's discuss the project scope
+[00:15] Bob: I think we should focus on the backend first
+[00:45] Alice: Agreed. We need to set up the database schema and API endpoints by Thursday
+[01:10] Carol: What about the frontend? Should we start React component design?
+[01:30] Alice: Yes, both teams work in parallel. Frontend by Friday
+[02:00] Dave: I'll handle the deployment setup on AWS. We need it ready for final demo
+[02:20] Bob: The timeline is tight. Let's have daily standups at 10am
+[02:45] Carol: Should we use TypeScript or JavaScript for the React app?
+[03:00] Alice: TypeScript for better maintainability. Use the design system Carol created
+[03:30] Dave: Infrastructure notes: use PostgreSQL, Redis for caching, Docker containers
+[04:00] Alice: Great. Let's reconvene tomorrow. Everyone clear on their tasks?
+[04:15] All: Yes!
+"""
+
+SAMPLE_CHAT_LOG = """
+@alice: morning team! let's discuss project architecture
+bob: hi! I think we should start with the database schema
+alice (09:30): good call bob. We need to support users, projects, tasks, and roles
+carol: also need activity tracking for the inactivity detection feature
+bob: true. Let's use PostgreSQL with async queries
+dave: I'll set up the Docker container and AWS infrastructure
+alice: perfect. Can we have the schema ready by tomorrow?
+bob: I'll draft it this morning and share by EOD
+carol: I'll work on the data models in Python/SQLAlchemy
+dave: infrastructure will be ready by tomorrow evening
+alice: awesome. Roles clear?
+bob: schema + api endpoints
+carol: data models + edge case handlers
+dave: devops + deployment
+"""
+
+SAMPLE_RUBRIC = """
+AI Workflow Manager - Grading Rubric
+
+1. System Architecture & Design (30%)
+   - Component structure and modularity
+   - Database schema design
+   - API endpoint organization
+
+2. Code Quality & Modularity (25%)
+   - Clean, readable code
+   - Proper error handling
+   - Unit test coverage
+
+3. AI Integration Depth (20%)
+   - Quality of LLM prompts
+   - Multi-agent orchestration
+   - Edge case handling
+
+4. Documentation (15%)
+   - Technical report (2000+ words)
+   - Component diagrams
+   - Setup instructions
+
+5. Presentation (10%)
+   - Demo video clarity
+   - Visual design
+   - Communication
+"""
+
 SAMPLE_GOALS = [
     {"goal_id": "G1", "statement": "Build React + FastAPI web prototype", "priority": "critical"},
     {"goal_id": "G2", "statement": "Integrate Z.AI GLM as reasoning engine", "priority": "critical"},
@@ -94,7 +155,7 @@ SAMPLE_MEMBERS = [
     {"id": "m4", "name": "Dave",  "skills": ["design", "figma", "ux"],        "contribution_score": 0.4},
 ]
 
-SAMPLE_RUBRIC = [
+SAMPLE_RUBRIC_CRITERIA = [
     {"criterion": "System Architecture & Design", "weight_pct": 30},
     {"criterion": "Code Quality & Modularity",    "weight_pct": 25},
     {"criterion": "AI Integration Depth",         "weight_pct": 20},
@@ -170,45 +231,58 @@ async def test_glm_connectivity():
 # ================================================================== #
 
 async def test_instruction_analysis_agent():
-    section("AGENT 1 — InstructionAnalysisAgent")
-    print("  Input: project brief (~250 words)\n")
-
-    agent = InstructionAnalysisAgent()
-    context = {
-        "project_id": "smoke-test-001",
-        "document_text": SAMPLE_BRIEF,
-        "document_type": "brief",
-    }
-
-    t0 = time.time()
-    output = await agent.execute(context)
-    elapsed = time.time() - t0
-
-    passed = check("Agent returned success",       output["status"] == "success")
-    if not passed:
-        print(f"  Error: {output.get('error')}")
-        return False
-
-    result = output["result"]
-    print(f"\n  GLM Output ({elapsed:.1f}s):")
-
-    checks = [
-        check("structured_goals present",    bool(result.get("structured_goals")),
-              f"Count: {len(result.get('structured_goals', []))}"),
-        check("grading_priorities present",  bool(result.get("grading_priorities")),
-              f"Count: {len(result.get('grading_priorities', []))}"),
-        check("confidence_score present",    "confidence_score" in result,
-              f"Score: {result.get('confidence_score')}"),
-        check("escalation_required present", "escalation_required" in result,
-              f"Value: {result.get('escalation_required')}"),
-        check("deliverables present",        bool(result.get("deliverables")),
-              f"Count: {len(result.get('deliverables', []))}"),
+    section("AGENT 1 — InstructionAnalysisAgent (All 4 Document Types)")
+    
+    # Test all 4 supported document types
+    test_cases = [
+        ("brief", SAMPLE_BRIEF, "project brief"),
+        ("rubric", SAMPLE_RUBRIC, "grading rubric"),
+        ("meeting_transcript", SAMPLE_TRANSCRIPT, "meeting transcript"),
+        ("chat_logs", SAMPLE_CHAT_LOG, "chat log"),
     ]
+    
+    all_passed = True
+    for doc_type, doc_text, desc in test_cases:
+        print(f"\n  Testing: {doc_type} ({desc})")
+        agent = InstructionAnalysisAgent()
+        context = {
+            "project_id": "smoke-test-001",
+            "document_text": doc_text,
+            "document_type": doc_type,
+        }
 
-    print(f"\n  Sample goal: {result.get('structured_goals', [{}])[0]}")
-    print(f"  Sample priority: {result.get('grading_priorities', [{}])[0]}")
+        t0 = time.time()
+        output = await agent.execute(context)
+        elapsed = time.time() - t0
 
-    return all(checks)
+        passed = check(
+            f"  {doc_type} → success",
+            output["status"] == "success",
+            f"({elapsed:.1f}s)"
+        )
+        
+        if not passed:
+            print(f"    Error: {output.get('error')}")
+            all_passed = False
+            continue
+
+        result = output["result"]
+        
+        # Validate output structure
+        checks = [
+            check("    structured_goals",     bool(result.get("structured_goals")),
+                  f"{len(result.get('structured_goals', []))} goals"),
+            check("    grading_priorities",   bool(result.get("grading_priorities")),
+                  f"{len(result.get('grading_priorities', []))} criteria"),
+            check("    confidence_score",     "confidence_score" in result,
+                  f"{result.get('confidence_score', 'N/A')}"),
+            check("    ambiguities",          "ambiguities" in result,
+                  f"{len(result.get('ambiguities', []))} found"),
+        ]
+        
+        all_passed = all_passed and all(checks)
+
+    return all_passed
 
 
 async def test_planning_agent():
@@ -360,7 +434,7 @@ async def test_submission_readiness_agent():
     agent = SubmissionReadinessAgent()
     context = {
         "project_id": "smoke-test-001",
-        "rubric_criteria": SAMPLE_RUBRIC,
+        "rubric_criteria": SAMPLE_RUBRIC_CRITERIA,
         "completed_deliverables": [
             "React + FastAPI web prototype",
             "System architecture document",

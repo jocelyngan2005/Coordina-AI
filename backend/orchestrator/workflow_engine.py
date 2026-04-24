@@ -31,6 +31,12 @@ from edge_cases.deadline_recovery import DeadlineRecovery
 from orchestrator.state_manager import StateManager
 from orchestrator.event_bus import EventBus, WorkflowEvent
 from memory.decision_log import DecisionLogger
+from parsers import (
+    document_parser,
+    transcript_parser,
+    chat_logs_parser,
+    rubric_parser,
+)
 from core.logger import logger
 from core.exceptions import WorkflowExecutionError
 
@@ -60,12 +66,19 @@ class WorkflowEngine:
     #  Stage 1+2: Ingest & Analyse                                         #
     # ------------------------------------------------------------------ #
     async def run_analysis(self, project_id: str, document_text: str, document_type: str) -> dict:
-        """Parse a brief/rubric and store structured goals in project state. Handle ambiguities."""
+        """
+        Parse a brief/rubric/transcript/chat logs and store structured goals in project state.
+        Supported document types: "brief", "rubric", "meeting_transcript", "chat_logs"
+        Handle ambiguities.
+        """
         state = await self.state_manager.get(project_id)
 
+        # Parse document based on type
+        parsed_document = self._parse_document(document_text, document_type)
+        
         context = {
             "project_id": project_id,
-            "document_text": document_text,
+            "document_text": parsed_document,
             "document_type": document_type,
         }
 
@@ -86,7 +99,7 @@ class WorkflowEngine:
             ambiguity_resolution = await ambiguity_resolver.resolve(
                 project_id=project_id,
                 ambiguities=ambiguities,
-                document_text=document_text,
+                document_text=parsed_document,
             )
             result["ambiguity_resolution"] = ambiguity_resolution
             result["confidence_score"] = confidence_score
@@ -107,13 +120,14 @@ class WorkflowEngine:
         state["rubric_criteria"] = result.get("grading_priorities", [])
         state["ambiguities"] = ambiguities
         state["ambiguity_resolution"] = ambiguity_resolution
+        state["document_type"] = document_type
         state["workflow_stage"] = "analysed"
         await self.state_manager.save(project_id, state)
 
         await self.decision_logger.log(
             project_id=project_id,
             agent="instruction_analysis",
-            decision_summary=f"Extracted {len(result.get('structured_goals', []))} goals. Confidence: {confidence_score:.1%}",
+            decision_summary=f"Extracted {len(result.get('structured_goals', []))} goals from {document_type}. Confidence: {confidence_score:.1%}",
             output=result,
         )
 
@@ -360,6 +374,54 @@ class WorkflowEngine:
     # ------------------------------------------------------------------ #
     #  Helpers                                                             #
     # ------------------------------------------------------------------ #
+    def _parse_document(self, document_text: str, document_type: str) -> str:
+        """
+        Parse document text based on type and return cleaned text.
+        
+        Supported types:
+        - "brief": Plain project brief (minimal parsing)
+        - "rubric": Grading rubric (minimal parsing)
+        - "meeting_transcript": Meeting transcript with timestamps and speakers
+        - "chat_logs": Chat log (Slack, Discord, Teams, etc.)
+        """
+        try:
+            if document_type == "meeting_transcript":
+                parsed = transcript_parser.parse(document_text)
+                logger.debug(
+                    f"[WorkflowEngine] Parsed transcript: {len(parsed['turns'])} turns, "
+                    f"{len(parsed['speakers'])} speakers"
+                )
+                return parsed["cleaned_text"]
+            
+            elif document_type == "chat_logs":
+                parsed = chat_logs_parser.parse(document_text)
+                logger.debug(
+                    f"[WorkflowEngine] Parsed chat logs: {parsed['message_count']} messages, "
+                    f"{len(parsed['speakers'])} speakers"
+                )
+                return parsed["cleaned_text"]
+            
+            elif document_type == "rubric":
+                # Rubrics are parsed by the GLM agent itself (structured format)
+                # Just return the raw text; the prompt handles rubric analysis
+                logger.debug(f"[WorkflowEngine] Preparing rubric document for analysis")
+                return document_text.strip()
+            
+            elif document_type == "brief":
+                # Briefs typically don't need special parsing
+                return document_text.strip()
+            
+            else:
+                logger.warning(
+                    f"[WorkflowEngine] Unknown document type '{document_type}'. Returning raw text."
+                )
+                return document_text
+        
+        except Exception as e:
+            logger.error(f"[WorkflowEngine] Error parsing document ({document_type}): {e}")
+            # Fall back to raw text on parse error
+            return document_text
+
     @staticmethod
     def _raise_on_agent_error(output: dict, agent_name: str):
         if output.get("status") == "error":
