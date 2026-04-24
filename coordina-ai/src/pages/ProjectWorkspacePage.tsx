@@ -1,7 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import PageLayout from '../components/layout/PageLayout';
 import { MOCK_PROJECT, MOCK_RISKS, MOCK_RUBRIC } from '../data/mockData';
-import type { Task, RiskAlert } from '../types';
+import type { Task, RiskAlert, RubricItem, Project } from '../types';
+import { projectsApi } from '../api/projects';
+import { tasksApi } from '../api/tasks';
+import { teamsApi } from '../api/teams';
+import { workflowApi, analyticsApi } from '../api/workflow';
+import { mapProject, extractRubric, extractRisks } from '../api/mappers';
 
 /* ─── Helpers ─── */
 function Avatar({ initials, size = 24, color }: { initials: string; size?: number; color?: string }) {
@@ -40,16 +46,15 @@ const priorityColor: Record<string, string> = {
   high: '#ef4444', medium: '#f59e0b', low: 'var(--grey-400)',
 };
 
-/* ─── Section A: Rubric Tracker (expandable with Submission Readiness) ─── */
-function RubricTracker() {
+/* ─── Section A: Rubric Tracker ─── */
+function RubricTracker({ rubric }: { rubric: RubricItem[] }) {
   const [showReadiness, setShowReadiness] = useState(false);
-  const rubric = MOCK_RUBRIC;
   const totalScore = rubric.reduce((s, r) => s + r.score, 0);
   const maxScore = rubric.reduce((s, r) => s + r.maxScore, 0);
-  const pct = Math.round((totalScore / maxScore) * 100);
+  const pct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
 
-  const partial = rubric.filter(r => r.status === 'partial').length;
-  const missing = rubric.filter(r => r.status === 'missing').length;
+  const partial = rubric.filter((r) => r.status === 'partial').length;
+  const missing = rubric.filter((r) => r.status === 'missing').length;
   const goNogo = missing === 0 && partial <= 1 ? 'GO' : 'NO-GO';
 
   return (
@@ -67,7 +72,7 @@ function RubricTracker() {
             <span style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 500, marginLeft: 6 }}>({pct}%)</span>
           </span>
           <button
-            onClick={() => setShowReadiness(o => !o)}
+            onClick={() => setShowReadiness((o) => !o)}
             title="Submission Readiness"
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -75,17 +80,16 @@ function RubricTracker() {
               color: 'var(--grey-500)', padding: 4, borderRadius: 4,
               transition: 'color 0.15s',
             }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--grey-900)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--grey-500)'; }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--grey-900)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--grey-500)'; }}
           >
             <svg style={{ transform: showReadiness ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
           </button>
         </div>
       </div>
 
-      {/* Segmented bar — sits directly in card, no white wrapper */}
       <div style={{ display: 'flex', height: 10, borderRadius: 6, overflow: 'hidden', gap: 2, marginBottom: 8 }}>
-        {rubric.map(r => {
+        {rubric.map((r) => {
           const segColor = r.status === 'covered' ? '#274133' : r.status === 'partial' ? '#ce9042' : '#7D2027';
           return (
             <div
@@ -97,9 +101,8 @@ function RubricTracker() {
         })}
       </div>
 
-      {/* Legend */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 4 }}>
-        {rubric.map(r => (
+        {rubric.map((r) => (
           <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <div style={{
               width: 6, height: 6, borderRadius: 2, flexShrink: 0,
@@ -112,7 +115,6 @@ function RubricTracker() {
         ))}
       </div>
 
-      {/* Expandable submission readiness details */}
       {showReadiness && (
         <div style={{ marginTop: 14 }}>
           <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
@@ -124,12 +126,8 @@ function RubricTracker() {
                 <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderBottom: i < rubric.length - 1 ? '1px solid var(--grey-100)' : 'none' }}>
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0 }}>
                     <circle cx="9" cy="9" r="8" stroke={circleColor} strokeWidth="1.8" fill={isCovered ? circleColor : 'none'} />
-                    {isCovered && (
-                      <polyline points="5,9 8,12 13,6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                    )}
-                    {isPartial && (
-                      <path d="M9 1a8 8 0 0 1 0 16" stroke={circleColor} strokeWidth="1.8" fill={circleColor} strokeLinecap="round" />
-                    )}
+                    {isCovered && <polyline points="5,9 8,12 13,6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />}
+                    {isPartial && <path d="M9 1a8 8 0 0 1 0 16" stroke={circleColor} strokeWidth="1.8" fill={circleColor} strokeLinecap="round" />}
                   </svg>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 11, fontWeight: 500, color: 'var(--grey-900)', marginBottom: 1 }}>
@@ -149,38 +147,45 @@ function RubricTracker() {
 }
 
 /* ─── Section B: Gantt Timeline ─── */
-function GanttTimeline({ }: { members: typeof MOCK_PROJECT['teamMembers'] }) {
-  const tasks = MOCK_PROJECT.tasks;
-
-  const [tooltip, setTooltip] = useState<{ task: typeof tasks[0]; x: number; y: number } | null>(null);
+function GanttTimeline({ tasks }: { tasks: Task[] }) {
+  const [tooltip, setTooltip] = useState<{ task: Task; x: number; y: number } | null>(null);
 
   const parseDate = (d: string) => new Date(d).getTime();
-  const minDate = Math.min(...tasks.map(t => parseDate(t.startDate)));
-  const maxDate = Math.max(...tasks.map(t => parseDate(t.dueDate)));
-  const totalMs = maxDate - minDate;
+  const validTasks = tasks.filter((t) => t.startDate && t.dueDate);
+
+  if (validTasks.length === 0) {
+    return (
+      <div style={card}>
+        <SectionTitle>Dynamic Timeline</SectionTitle>
+        <p style={{ fontSize: 13, color: 'var(--text-3)' }}>No tasks with dates available.</p>
+      </div>
+    );
+  }
+
+  const minDate = Math.min(...validTasks.map((t) => parseDate(t.startDate)));
+  const maxDate = Math.max(...validTasks.map((t) => parseDate(t.dueDate)));
+  const totalMs = maxDate - minDate || 1;
 
   const toPercent = (d: string) => ((parseDate(d) - minDate) / totalMs) * 100;
   const widthPct = (s: string, e: string) => Math.max(((parseDate(e) - parseDate(s)) / totalMs) * 100, 1.5);
 
   const axisLabels: { label: string; pct: number }[] = [];
-  const start = new Date(minDate);
-  const end = new Date(maxDate);
-  const cursor = new Date(start);
+  const cursor = new Date(minDate);
   cursor.setDate(1);
-  while (cursor <= end) {
+  while (cursor.getTime() <= maxDate) {
     const pct = ((cursor.getTime() - minDate) / totalMs) * 100;
     axisLabels.push({ label: cursor.toLocaleDateString('en', { month: 'short', day: 'numeric' }), pct });
     cursor.setDate(cursor.getDate() + 7);
   }
 
-  const hasDepOn = (id: string) => tasks.some(t => t.dependsOn?.includes(id));
+  const hasDepOn = (id: string) => validTasks.some((t) => t.dependsOn?.includes(id));
 
   return (
     <div style={card}>
       <SectionTitle>Dynamic Timeline</SectionTitle>
 
       <div style={{ position: 'relative', height: 18, marginBottom: 4, marginLeft: 140 }}>
-        {axisLabels.map(ax => (
+        {axisLabels.map((ax) => (
           <span key={ax.label} style={{
             position: 'absolute', left: `${ax.pct}%`,
             fontSize: 9, color: 'var(--text-3)', whiteSpace: 'nowrap', transform: 'translateX(-50%)',
@@ -189,22 +194,19 @@ function GanttTimeline({ }: { members: typeof MOCK_PROJECT['teamMembers'] }) {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-        {tasks.map(task => {
+        {validTasks.map((task) => {
           const sc = statusConfig[task.status];
           const hasDep = (task.dependsOn?.length ?? 0) > 0;
           const isBlocking = hasDepOn(task.id);
-
           return (
             <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ width: 140, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{
-                  fontSize: 10, color: 'var(--grey-700)', whiteSpace: 'nowrap',
-                  overflow: 'hidden', textOverflow: 'ellipsis', flex: 1,
-                }}>{task.title.split(' ').slice(0, 4).join(' ')}</span>
+                <span style={{ fontSize: 10, color: 'var(--grey-700)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+                  {task.title.split(' ').slice(0, 4).join(' ')}
+                </span>
                 {hasDep && <span title="Has dependencies" style={{ fontSize: 9 }}>🔗</span>}
                 {isBlocking && <span title="Blocks other tasks" style={{ fontSize: 9 }}>⚡</span>}
               </div>
-
               <div style={{ flex: 1, height: 14, background: 'var(--grey-100)', borderRadius: 4, position: 'relative' }}>
                 <div
                   style={{
@@ -218,8 +220,8 @@ function GanttTimeline({ }: { members: typeof MOCK_PROJECT['teamMembers'] }) {
                     transition: 'width 0.3s',
                     cursor: 'pointer',
                   }}
-                  onMouseEnter={e => setTooltip({ task, x: e.clientX, y: e.clientY })}
-                  onMouseMove={e => setTooltip(t => t ? { ...t, x: e.clientX, y: e.clientY } : null)}
+                  onMouseEnter={(e) => setTooltip({ task, x: e.clientX, y: e.clientY })}
+                  onMouseMove={(e) => setTooltip((t) => t ? { ...t, x: e.clientX, y: e.clientY } : null)}
                   onMouseLeave={() => setTooltip(null)}
                 />
               </div>
@@ -245,50 +247,39 @@ function GanttTimeline({ }: { members: typeof MOCK_PROJECT['teamMembers'] }) {
         </div>
       </div>
 
-      {/* Floating tooltip overlay */}
       {tooltip && (
         <div style={{
           position: 'fixed',
-          left: tooltip.x + 4,
-          top: tooltip.y + 4,
-          zIndex: 9999,
-          pointerEvents: 'none',
-          background: 'var(--white)',
-          color: 'var(--grey-900)',
-          borderRadius: 8,
-          padding: '8px 12px',
+          left: tooltip.x + 4, top: tooltip.y + 4,
+          zIndex: 9999, pointerEvents: 'none',
+          background: 'var(--white)', color: 'var(--grey-900)',
+          borderRadius: 8, padding: '8px 12px',
           boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-          border: '1px solid var(--border)',
-          maxWidth: 260,
+          border: '1px solid var(--border)', maxWidth: 260,
         }}>
           <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, lineHeight: 1.4 }}>{tooltip.task.title}</p>
-          <p style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 2 }}>
-            {tooltip.task.startDate} → {tooltip.task.dueDate}
-          </p>
-          <p style={{ fontSize: 10, color: 'var(--text-3)' }}>
-            {statusConfig[tooltip.task.status].label} · {tooltip.task.priority} priority
-          </p>
+          <p style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 2 }}>{tooltip.task.startDate} → {tooltip.task.dueDate}</p>
+          <p style={{ fontSize: 10, color: 'var(--text-3)' }}>{statusConfig[tooltip.task.status].label} · {tooltip.task.priority} priority</p>
         </div>
       )}
     </div>
   );
 }
 
-/* ─── Section C: Accountability Matrix + Task List (combined card) ─── */
+/* ─── Section C: Accountability + Task List ─── */
 const TAB_LIST: { key: Task['status']; label: string; color: string }[] = [
   { key: 'in_progress', label: 'In Progress', color: '#f59e0b' },
   { key: 'backlog', label: 'Backlog', color: 'var(--grey-400)' },
   { key: 'done', label: 'Done', color: '#22c55e' },
 ];
 
-function AccountabilityAndTasks({ members }: { members: typeof MOCK_PROJECT['teamMembers'] }) {
-  const tasks = MOCK_PROJECT.tasks;
-  const memberMap = Object.fromEntries(members.map(m => [m.id, m]));
+function AccountabilityAndTasks({ project }: { project: Project }) {
+  const { tasks, teamMembers: members } = project;
+  const memberMap = Object.fromEntries(members.map((m) => [m.id, m]));
   const [activeTab, setActiveTab] = useState<Task['status']>('in_progress');
-  const visibleTasks = tasks.filter(t => t.status === activeTab);
+  const visibleTasks = tasks.filter((t) => t.status === activeTab);
 
-  /* ── Pie chart maths ── */
-  const total = members.reduce((s, m) => s + m.contributionScore, 0);
+  const total = members.reduce((s, m) => s + m.contributionScore, 0) || 1;
   const colors = ['#542916', '#b79858', '#a13a1e', '#88b8ce', '#f1c166'];
   let cumulative = 0;
   const slices = members.map((m, i) => {
@@ -311,96 +302,82 @@ function AccountabilityAndTasks({ members }: { members: typeof MOCK_PROJECT['tea
 
   return (
     <div style={{ ...card, padding: 0, display: 'flex', flexDirection: 'column' }}>
-      {/* ── Top: Accountability Matrix ── */}
       <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--border)' }}>
         <SectionTitle>Accountability Matrix</SectionTitle>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <svg width="150" height="150" viewBox="0 0 120 120" style={{ flexShrink: 0 }}>
-            {slices.map(s => (
-              <path key={s.id} d={slicePath(s.startAngle, s.startAngle + s.pct)} fill={s.color} opacity={0.9}>
-                <title>{s.name}: {Math.round(s.pct * 100)}%</title>
-              </path>
-            ))}
-            <circle cx="60" cy="60" r="26" fill="white" />
-            <text x="60" y="55" textAnchor="middle" fontSize="9" fill="var(--grey-500)">Score</text>
-            <text x="60" y="68" textAnchor="middle" fontSize="12" fontWeight="700" fill="var(--grey-900)">
-              {Math.round((members.reduce((s, m) => s + m.contributionScore, 0) / members.length))}%
-            </text>
-          </svg>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-            {slices.map(s => (
-              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Avatar initials={s.initials} size={24} color={s.color} />
-                <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--grey-900)', flex: 1 }}>
-                  {s.name.split(' ')[0]} <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>· {s.role}</span>
-                </span>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--grey-900)' }}>{s.contributionScore}%</p>
-                  <div style={{ width: 40, height: 3, background: 'var(--grey-150)', borderRadius: 2, marginTop: 2 }}>
-                    <div style={{ width: `${s.contributionScore}%`, height: '100%', background: s.color, borderRadius: 2 }} />
+        {members.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--text-3)' }}>No team members yet.</p>
+        ) : (
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+            <svg width="150" height="150" viewBox="0 0 120 120" style={{ flexShrink: 0 }}>
+              {slices.map((s) => (
+                <path key={s.id} d={slicePath(s.startAngle, s.startAngle + s.pct)} fill={s.color} opacity={0.9}>
+                  <title>{s.name}: {Math.round(s.pct * 100)}%</title>
+                </path>
+              ))}
+              <circle cx="60" cy="60" r="26" fill="white" />
+              <text x="60" y="55" textAnchor="middle" fontSize="9" fill="var(--grey-500)">Score</text>
+              <text x="60" y="68" textAnchor="middle" fontSize="12" fontWeight="700" fill="var(--grey-900)">
+                {members.length > 0 ? Math.round(members.reduce((s, m) => s + m.contributionScore, 0) / members.length) : 0}%
+              </text>
+            </svg>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+              {slices.map((s) => (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Avatar initials={s.initials} size={24} color={s.color} />
+                  <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--grey-900)', flex: 1 }}>
+                    {s.name.split(' ')[0]} <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>· {s.role}</span>
+                  </span>
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--grey-900)' }}>{s.contributionScore}%</p>
+                    <div style={{ width: 40, height: 3, background: 'var(--grey-150)', borderRadius: 2, marginTop: 2 }}>
+                      <div style={{ width: `${s.contributionScore}%`, height: '100%', background: s.color, borderRadius: 2 }} />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* ── Bottom: Tasks with arrow navigator ── */}
       <div style={{ padding: '12px 18px 16px' }}>
-        {/* Arrow tab navigator — left aligned */}
         {(() => {
-          const currentIndex = TAB_LIST.findIndex(t => t.key === activeTab);
+          const currentIndex = TAB_LIST.findIndex((t) => t.key === activeTab);
           const currentTab = TAB_LIST[currentIndex];
-          const count = tasks.filter(t => t.status === activeTab).length;
+          const count = tasks.filter((t) => t.status === activeTab).length;
           const prev = () => setActiveTab(TAB_LIST[(currentIndex - 1 + TAB_LIST.length) % TAB_LIST.length].key);
           const next = () => setActiveTab(TAB_LIST[(currentIndex + 1) % TAB_LIST.length].key);
           return (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 12 }}>
               <button onClick={prev} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: 6, color: 'var(--grey-500)', display: 'flex', alignItems: 'center' }}
-                onMouseEnter={e => (e.currentTarget.style.color = 'var(--grey-900)')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'var(--grey-500)')}>
+                onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--grey-900)')}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--grey-500)')}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
               </button>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--grey-900)' }}>{currentTab.label}</span>
               <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 99, background: '#7D2027', color: '#fff' }}>{count}</span>
               <button onClick={next} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: 6, color: 'var(--grey-500)', display: 'flex', alignItems: 'center' }}
-                onMouseEnter={e => (e.currentTarget.style.color = 'var(--grey-900)')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'var(--grey-500)')}>
+                onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--grey-900)')}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--grey-500)')}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg>
               </button>
             </div>
           );
         })()}
 
-        {/* Task rows */}
         <div style={{ background: 'var(--white)', borderRadius: 8, padding: '0 8px', display: 'flex', flexDirection: 'column', gap: 0, minHeight: 72, border: '1px solid var(--border)' }}>
           {visibleTasks.length === 0 && (
-            <p style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', padding: '24px 0' }}>
-              No tasks in this stage
-            </p>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', padding: '24px 0' }}>No tasks in this stage</p>
           )}
-          {visibleTasks.map(task => {
+          {visibleTasks.map((task) => {
             const m = memberMap[task.assigneeId];
             const conf = task.aiConfidence ?? 0;
             return (
-              <div
-                key={task.id}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '7px 0',
-                  borderBottom: '1px solid var(--grey-100)',
-                  cursor: 'default',
-                }}
-              >
-
+              <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--grey-100)', cursor: 'default' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--grey-900)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 2 }}>
-                    {task.title}
-                  </p>
+                  <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--grey-900)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 2 }}>{task.title}</p>
                   <div style={{ display: 'flex', gap: 4 }}>
-                    {task.tags.slice(0, 2).map(tag => (
+                    {task.tags.slice(0, 2).map((tag) => (
                       <span key={tag} style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)', background: 'var(--grey-100)', borderRadius: 4, padding: '1px 5px' }}>{tag}</span>
                     ))}
                   </div>
@@ -436,51 +413,33 @@ const ARTIFACTS = [
 const artColors = { found: '#274133', partial: '#ce9042', missing: '#9ca3af' };
 
 function ArtifactsCard() {
-  const foundCount = ARTIFACTS.filter(a => a.status === 'found').length;
-
+  const foundCount = ARTIFACTS.filter((a) => a.status === 'found').length;
   return (
     <div style={{ ...card, padding: 0, display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
       <div style={{ padding: '16px 18px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <SectionTitle>Required Artifacts</SectionTitle>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)' }}>{foundCount}/{ARTIFACTS.length} complete</span>
         </div>
       </div>
-
-      {/* Artifact rows */}
       <div style={{ background: 'var(--white)', margin: '0 12px 12px', borderRadius: 8, display: 'flex', flexDirection: 'column', flex: 1, border: '1px solid var(--border)' }}>
         {ARTIFACTS.map((a, i) => {
           const color = artColors[a.status as keyof typeof artColors];
           const isFound = a.status === 'found';
           const isPartial = a.status === 'partial';
           return (
-            <div
-              key={a.name}
-              style={{
-                display: 'flex', gap: 12, padding: '10px 14px', alignItems: 'center',
-                borderBottom: i < ARTIFACTS.length - 1 ? '1px solid var(--grey-100)' : 'none',
-              }}
-            >
-              {/* Radio/checklist circle */}
+            <div key={a.name} style={{ display: 'flex', gap: 12, padding: '10px 14px', alignItems: 'center', borderBottom: i < ARTIFACTS.length - 1 ? '1px solid var(--grey-100)' : 'none' }}>
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0 }}>
                 <circle cx="9" cy="9" r="8" stroke={color} strokeWidth="1.8" fill={isFound ? color : 'none'} />
-                {isFound && (
-                  <polyline points="5,9 8,12 13,6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                )}
-                {isPartial && (
-                  <path d="M9 1a8 8 0 0 1 0 16" stroke={color} strokeWidth="1.8" fill={color} strokeLinecap="round" />
-                )}
+                {isFound && <polyline points="5,9 8,12 13,6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />}
+                {isPartial && <path d="M9 1a8 8 0 0 1 0 16" stroke={color} strokeWidth="1.8" fill={color} strokeLinecap="round" />}
               </svg>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 12, fontWeight: 500, color: isFound ? 'var(--grey-900)' : 'var(--grey-700)', marginBottom: 1, textDecoration: isFound ? 'none' : 'none' }}>{a.name}</p>
+                <p style={{ fontSize: 12, fontWeight: 500, color: isFound ? 'var(--grey-900)' : 'var(--grey-700)', marginBottom: 1 }}>{a.name}</p>
                 <p style={{ fontSize: 10, color: 'var(--text-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.file}</p>
               </div>
               {a.status === 'missing' && (
-                <button style={{
-                  fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 6, flexShrink: 0,
-                  background: 'var(--grey-900)', color: 'var(--white)', border: 'none', cursor: 'pointer',
-                }}>Upload</button>
+                <button style={{ fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 6, flexShrink: 0, background: 'var(--grey-900)', color: 'var(--white)', border: 'none', cursor: 'pointer' }}>Upload</button>
               )}
             </div>
           );
@@ -491,30 +450,27 @@ function ArtifactsCard() {
 }
 
 /* ─── Section E: My Tasks ─── */
-const MY_MEMBER_ID = 'm1'; // current user
+const MY_MEMBER_ID = 'm1';
 type TaskState = 'none' | 'in_progress' | 'done';
 
-function MyTasksCard() {
-  const allTasks = MOCK_PROJECT.tasks;
-  const myTasks = allTasks.filter(t => t.assigneeId === MY_MEMBER_ID);
+function MyTasksCard({ tasks }: { tasks: Task[] }) {
+  const myTasks = tasks.filter((t) => t.assigneeId === MY_MEMBER_ID);
 
   const [states, setStates] = useState<Map<string, TaskState>>(() => {
     const m = new Map<string, TaskState>();
-    myTasks.forEach(t => {
-      m.set(t.id, t.status === 'done' ? 'done' : 'none');
-    });
+    myTasks.forEach((t) => { m.set(t.id, t.status === 'done' ? 'done' : 'none'); });
     return m;
   });
 
   const cycle = (id: string) =>
-    setStates(prev => {
+    setStates((prev) => {
       const next = new Map(prev);
       const cur = next.get(id) ?? 'none';
       next.set(id, cur === 'none' ? 'in_progress' : cur === 'in_progress' ? 'done' : 'none');
       return next;
     });
 
-  const doneCount = [...states.values()].filter(s => s === 'done').length;
+  const doneCount = [...states.values()].filter((s) => s === 'done').length;
   const total = myTasks.length;
 
   return (
@@ -523,10 +479,10 @@ function MyTasksCard() {
         <SectionTitle>My Tasks</SectionTitle>
         <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', marginBottom: 12 }}>{doneCount}/{total} complete</span>
       </div>
-
-
-
       <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+        {myTasks.length === 0 && (
+          <p style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', padding: '24px 0' }}>No tasks assigned to you yet.</p>
+        )}
         {myTasks.map((task, i) => {
           const state = states.get(task.id) ?? 'none';
           const isDone = state === 'done';
@@ -540,46 +496,27 @@ function MyTasksCard() {
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '10px 14px',
                 borderBottom: i < myTasks.length - 1 ? '1px solid var(--grey-100)' : 'none',
-                cursor: 'pointer',
-                transition: 'background 0.12s',
-                background: 'transparent',
+                cursor: 'pointer', transition: 'background 0.12s', background: 'transparent',
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--grey-50)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.background = 'var(--grey-50)')}
+              onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.background = 'transparent')}
             >
-              {/* 3-state circle */}
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0, transition: 'all 0.15s' }}>
-                {/* base ring */}
                 <circle cx="9" cy="9" r="8"
                   stroke={isDone ? '#274133' : isProgress ? '#ce9042' : 'var(--grey-300)'}
-                  strokeWidth="1.8"
-                  fill={isDone ? '#274133' : 'none'}
+                  strokeWidth="1.8" fill={isDone ? '#274133' : 'none'}
                 />
-                {/* in_progress: amber half-fill arc */}
-                {isProgress && (
-                  <path d="M9 1a8 8 0 0 1 0 16" stroke="#ce9042" strokeWidth="1.8" fill="#ce9042" strokeLinecap="round" />
-                )}
-                {/* done: white checkmark */}
-                {isDone && (
-                  <polyline points="5,9 8,12 13,6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                )}
+                {isProgress && <path d="M9 1a8 8 0 0 1 0 16" stroke="#ce9042" strokeWidth="1.8" fill="#ce9042" strokeLinecap="round" />}
+                {isDone && <polyline points="5,9 8,12 13,6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />}
               </svg>
-
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{
-                  fontSize: 12, fontWeight: 500, marginBottom: 2,
-                  color: isDone ? 'var(--text-3)' : 'var(--grey-900)',
-                  textDecoration: isDone ? 'line-through' : 'none',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  transition: 'color 0.15s',
-                }}>{task.title}</p>
+                <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 2, color: isDone ? 'var(--text-3)' : 'var(--grey-900)', textDecoration: isDone ? 'line-through' : 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'color 0.15s' }}>{task.title}</p>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  {task.tags.slice(0, 2).map(tag => (
+                  {task.tags.slice(0, 2).map((tag) => (
                     <span key={tag} style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)', background: 'var(--grey-100)', borderRadius: 4, padding: '1px 5px' }}>{tag}</span>
                   ))}
                 </div>
               </div>
-
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                 <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{task.dueDate.slice(5)}</span>
                 <div style={{ width: 7, height: 7, borderRadius: '50%', background: pColor }} title={task.priority} />
@@ -592,16 +529,10 @@ function MyTasksCard() {
   );
 }
 
-/* ─── Notification Bell (inline) ─── */
-const severityColor: Record<string, string> = {
-  high: '#7d2027', medium: '#ce9042', low: '#274133',
-};
-const severityBg: Record<string, string> = {
-  high: '#f9e8e9', medium: '#fdf3e3', low: '#e6efeb',
-};
-const typeIcon: Record<string, string> = {
-  inactivity: '👤', deadline: '⏰', ambiguity: '❓', missing_artifact: '📄',
-};
+/* ─── Notification Bell ─── */
+const severityColor: Record<string, string> = { high: '#7d2027', medium: '#ce9042', low: '#274133' };
+const severityBg: Record<string, string> = { high: '#f9e8e9', medium: '#fdf3e3', low: '#e6efeb' };
+const typeIcon: Record<string, string> = { inactivity: '👤', deadline: '⏰', ambiguity: '❓', missing_artifact: '📄' };
 type AlertAction = { label: string; variant: 'primary' | 'ghost' };
 const actionsByType: Record<string, AlertAction[]> = {
   inactivity: [{ label: 'Send Reminder', variant: 'primary' }, { label: 'Reassign Task', variant: 'ghost' }],
@@ -609,6 +540,7 @@ const actionsByType: Record<string, AlertAction[]> = {
   ambiguity: [{ label: 'Request Clarification', variant: 'primary' }, { label: 'Flag for Review', variant: 'ghost' }],
   missing_artifact: [{ label: 'Upload Artifact', variant: 'primary' }, { label: 'Assign Owner', variant: 'ghost' }],
 };
+
 function NotificationBell({ notifications }: { notifications: RiskAlert[] }) {
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -624,37 +556,20 @@ function NotificationBell({ notifications }: { notifications: RiskAlert[] }) {
     setTimeout(() => setToast(null), 2500);
   }
 
-  const btnBase: React.CSSProperties = {
-    display: 'inline-flex', alignItems: 'center', gap: 4,
-    padding: '3px 9px', borderRadius: 5, fontSize: 10, fontWeight: 600,
-    cursor: 'pointer', border: '1px solid transparent', transition: 'opacity .15s',
-    background: 'none',
-  };
+  const btnBase: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 5, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: '1px solid transparent', transition: 'opacity .15s', background: 'none' };
   const btnPrimary: React.CSSProperties = { ...btnBase, background: 'var(--grey-900)', color: 'var(--white)', borderColor: 'var(--grey-900)' };
   const btnGhost: React.CSSProperties = { ...btnBase, background: 'transparent', color: 'var(--grey-700)', borderColor: 'var(--border)' };
-
   const hasAlerts = notifications.length > 0;
+
   return (
     <>
-      {/* Toast */}
       {toast && (
-        <div style={{
-          position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
-          background: 'var(--grey-900)', color: 'var(--white)',
-          padding: '9px 16px', borderRadius: 8, fontSize: 12, fontWeight: 500,
-          boxShadow: '0 4px 16px rgba(0,0,0,.18)', pointerEvents: 'none',
-        }}>{toast}</div>
+        <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 9999, background: 'var(--grey-900)', color: 'var(--white)', padding: '9px 16px', borderRadius: 8, fontSize: 12, fontWeight: 500, boxShadow: '0 4px 16px rgba(0,0,0,.18)', pointerEvents: 'none' }}>{toast}</div>
       )}
       <div ref={ref} style={{ position: 'relative' }}>
         <button
-          onClick={() => setOpen(o => !o)}
-          style={{
-            position: 'relative', width: 34, height: 34,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: open ? 'var(--grey-100)' : 'transparent',
-            border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer',
-            transition: 'background 0.15s',
-          }}
+          onClick={() => setOpen((o) => !o)}
+          style={{ position: 'relative', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', background: open ? 'var(--grey-100)' : 'transparent', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', transition: 'background 0.15s' }}
           title="Risk alerts"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--grey-700)" strokeWidth="2">
@@ -662,23 +577,11 @@ function NotificationBell({ notifications }: { notifications: RiskAlert[] }) {
             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
           </svg>
           {hasAlerts && (
-            <span style={{
-              position: 'absolute', top: -4, right: -4,
-              minWidth: 16, height: 16, borderRadius: 99,
-              background: 'var(--grey-900)', color: 'var(--white)',
-              fontSize: 9, fontWeight: 700,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: '0 3px', border: '2px solid var(--white)',
-            }}>{notifications.length}</span>
+            <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 99, background: 'var(--grey-900)', color: 'var(--white)', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', border: '2px solid var(--white)' }}>{notifications.length}</span>
           )}
         </button>
         {open && (
-          <div style={{
-            position: 'absolute', right: 0, top: 'calc(100% + 8px)',
-            width: 360, maxHeight: 460, overflowY: 'auto',
-            background: 'var(--white)', border: '1px solid var(--border)',
-            borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 1000,
-          }}>
+          <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 360, maxHeight: 460, overflowY: 'auto', background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 1000 }}>
             <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--grey-900)' }}>Intervention &amp; Risk</span>
               {hasAlerts && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'var(--grey-150)', color: 'var(--grey-800)' }}>{notifications.length} active</span>}
@@ -698,13 +601,13 @@ function NotificationBell({ notifications }: { notifications: RiskAlert[] }) {
                         </div>
                         <p style={{ fontSize: 11, color: 'var(--grey-600)', lineHeight: 1.4, marginBottom: 7 }}>{risk.detail}</p>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 4 }}>
-                          {(actionsByType[risk.type] ?? []).map(btn => (
+                          {(actionsByType[risk.type] ?? []).map((btn) => (
                             <button
                               key={btn.label}
                               style={{ ...(btn.variant === 'primary' ? btnPrimary : btnGhost), justifyContent: 'center', width: '100%' }}
                               onClick={() => handleAction(btn.label)}
-                              onMouseEnter={e => (e.currentTarget.style.opacity = '0.75')}
-                              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                              onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = '0.75')}
+                              onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = '1')}
                             >{btn.label}</button>
                           ))}
                         </div>
@@ -722,25 +625,118 @@ function NotificationBell({ notifications }: { notifications: RiskAlert[] }) {
   );
 }
 
+/* ─── Loading skeleton ─── */
+function WorkspaceSkeleton() {
+  const shimmer: React.CSSProperties = { background: 'var(--grey-150)', borderRadius: 6, animation: 'pulse 1.5s ease-in-out infinite' };
+  return (
+    <PageLayout>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ height: 36, width: '50%', ...shimmer }} />
+        <div style={{ height: 14, width: '30%', ...shimmer }} />
+        <div style={{ height: 120, ...shimmer }} />
+        <div style={{ height: 200, ...shimmer }} />
+      </div>
+    </PageLayout>
+  );
+}
+
 /* ─── Main Page ─── */
 export default function ProjectWorkspacePage() {
-  const p = MOCK_PROJECT;
+  const { id: urlId } = useParams<{ id: string }>();
+  const projectId = urlId ?? 'proj-001';
+  const isMockId = projectId === 'proj-001';
 
-  const rubric = MOCK_RUBRIC;
-  const missing = rubric.filter(r => r.status === 'missing').length;
-  const partial = rubric.filter(r => r.status === 'partial').length;
+  const [project, setProject] = useState<Project | null>(null);
+  const [rubric, setRubric] = useState<RubricItem[]>(MOCK_RUBRIC);
+  const [risks, setRisks] = useState<RiskAlert[]>(MOCK_RISKS);
+  const [loading, setLoading] = useState(!isMockId);
+  const [apiAvailable, setApiAvailable] = useState(true);
+
+  useEffect(() => {
+    if (isMockId) {
+      setProject(MOCK_PROJECT);
+      setRubric(MOCK_RUBRIC);
+      setRisks(MOCK_RISKS);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function fetchAll() {
+      try {
+        const [backendProject, backendTasks, backendMembers, workflowState, analytics] =
+          await Promise.all([
+            projectsApi.get(projectId),
+            tasksApi.listByProject(projectId),
+            teamsApi.listByProject(projectId),
+            workflowApi.getState(projectId).catch(() => null),
+            analyticsApi.projectOverview(projectId).catch(() => null),
+          ]);
+
+        if (cancelled) return;
+
+        const completionPct = analytics?.completion_pct ?? 0;
+        const riskScore =
+          analytics?.health_score != null
+            ? Math.round(analytics.health_score)
+            : 0;
+
+        const mapped = mapProject(
+          backendProject,
+          backendTasks,
+          backendMembers,
+          completionPct,
+          riskScore,
+        );
+        setProject(mapped);
+
+        if (workflowState) {
+          const mappedRubric = extractRubric(workflowState.submission_report);
+          if (mappedRubric) setRubric(mappedRubric);
+
+          const mappedRisks = extractRisks(workflowState.last_risk_report);
+          if (mappedRisks) setRisks(mappedRisks);
+        }
+
+        setApiAvailable(true);
+      } catch {
+        if (!cancelled) {
+          setProject(MOCK_PROJECT);
+          setApiAvailable(false);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void fetchAll();
+    return () => { cancelled = true; };
+  }, [projectId, isMockId]);
+
+  if (loading) return <WorkspaceSkeleton />;
+
+  const p = project ?? MOCK_PROJECT;
+  const missing = rubric.filter((r) => r.status === 'missing').length;
+  const partial = rubric.filter((r) => r.status === 'partial').length;
   const goNogo = missing === 0 && partial <= 1 ? 'GO' : 'NO-GO';
 
   return (
     <PageLayout>
       {/* ── Page Header ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 20,
-      }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontSize: 28, fontWeight: 400, color: 'var(--grey-900)', lineHeight: 1.2, marginBottom: 4 }}>{p.name}</h1>
-          <p style={{ fontSize: 13, color: 'var(--text-3)' }}>Due {p.deadline} · {p.teamMembers.length} members · Risk {p.riskScore}%</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <h1 style={{ fontSize: 28, fontWeight: 400, color: 'var(--grey-900)', lineHeight: 1.2 }}>{p.name}</h1>
+            {!apiAvailable && (
+              <span style={{ fontSize: 11, color: 'var(--text-3)', padding: '3px 8px', background: 'var(--grey-100)', borderRadius: 6 }}>
+                Demo mode
+              </span>
+            )}
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--text-3)' }}>
+            {p.deadline ? `Due ${p.deadline} · ` : ''}{p.teamMembers.length} members · Risk {p.riskScore}%
+          </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {goNogo === 'GO' && (
@@ -749,25 +745,18 @@ export default function ProjectWorkspacePage() {
               <span style={{ fontSize: 12, fontWeight: 600, color: '#15803d' }}>Ready for submission</span>
             </div>
           )}
-          <NotificationBell notifications={MOCK_RISKS} />
+          <NotificationBell notifications={risks} />
         </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-        {/* ROW 1 — Rubric Tracker (expandable, full width) */}
-        <RubricTracker />
-
-        {/* ROW 2 — Dynamic Timeline (full width) */}
-        <GanttTimeline members={p.teamMembers} />
-
-        {/* ROW 3 — Accountability (left) | My Tasks (centre) | Artifacts (right) */}
+        <RubricTracker rubric={rubric} />
+        <GanttTimeline tasks={p.tasks} />
         <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr 2fr', gap: 14, alignItems: 'start' }}>
-          <AccountabilityAndTasks members={p.teamMembers} />
-          <MyTasksCard />
+          <AccountabilityAndTasks project={p} />
+          <MyTasksCard tasks={p.tasks} />
           <ArtifactsCard />
         </div>
-
       </div>
     </PageLayout>
   );

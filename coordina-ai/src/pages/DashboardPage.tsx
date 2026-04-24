@@ -1,8 +1,12 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../components/layout/PageLayout';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import { MOCK_PROJECT } from '../data/mockData';
+import { projectsApi } from '../api/projects';
+import { analyticsApi } from '../api/workflow';
+import type { BackendProject, ProjectAnalytics } from '../api/types';
 
 const card: React.CSSProperties = {
   background: 'var(--white)',
@@ -35,12 +39,86 @@ function MemberAvatar({ initials }: { initials: string }) {
   );
 }
 
+// Skeleton card shown while loading
+function ProjectCardSkeleton() {
+  const shimmer: React.CSSProperties = {
+    background: 'var(--grey-150)',
+    borderRadius: 4,
+    animation: 'pulse 1.5s ease-in-out infinite',
+  };
+  return (
+    <div style={{ ...card, marginBottom: 24 }}>
+      <div style={{ height: 16, width: '40%', marginBottom: 10, ...shimmer }} />
+      <div style={{ height: 12, width: '70%', marginBottom: 20, ...shimmer }} />
+      <div style={{ height: 4, width: '100%', marginBottom: 14, ...shimmer }} />
+      <div style={{ height: 28, width: '30%', ...shimmer }} />
+    </div>
+  );
+}
+
+interface ProjectRowData {
+  project: BackendProject;
+  analytics: ProjectAnalytics | null;
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const p = MOCK_PROJECT;
-  const doneTasks = p.tasks.filter(t => t.status === 'done').length;
-  const activeTasks = p.tasks.filter(t => t.status === 'in_progress').length;
 
+  // ── Real data from backend ────────────────────────────────────────────────
+  const [rows, setRows] = useState<ProjectRowData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [apiAvailable, setApiAvailable] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const projects = await projectsApi.list();
+        if (cancelled) return;
+
+        // Fetch analytics for each project in parallel (best-effort)
+        const analyticsResults = await Promise.allSettled(
+          projects.map((p) => analyticsApi.projectOverview(p.id)),
+        );
+
+        if (cancelled) return;
+
+        setRows(
+          projects.map((p, i) => ({
+            project: p,
+            analytics:
+              analyticsResults[i].status === 'fulfilled'
+                ? (analyticsResults[i] as PromiseFulfilledResult<ProjectAnalytics>).value
+                : null,
+          })),
+        );
+        setApiAvailable(true);
+      } catch {
+        if (!cancelled) setApiAvailable(false);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void load();
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── Derived stats ─────────────────────────────────────────────────────────
+  const mockDoneTasks = MOCK_PROJECT.tasks.filter((t) => t.status === 'done').length;
+  const mockActiveTasks = MOCK_PROJECT.tasks.filter((t) => t.status === 'in_progress').length;
+
+  const activeCount = apiAvailable ? rows.filter((r) => r.project.status === 'active').length : 1;
+  const atRiskCount = apiAvailable ? rows.filter((r) => r.project.status === 'at_risk').length : 0;
+
+  const firstAnalytics = rows[0]?.analytics ?? null;
+  const totalTasks = firstAnalytics?.total_tasks ?? MOCK_PROJECT.tasks.length;
+  const doneTasks = firstAnalytics?.task_stats?.done ?? mockDoneTasks;
+  const activeTasks = firstAnalytics?.task_stats?.in_progress ?? mockActiveTasks;
+  const riskScore = firstAnalytics?.health_score ?? MOCK_PROJECT.riskScore;
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <PageLayout>
       {/* Page Header */}
@@ -51,52 +129,137 @@ export default function DashboardPage() {
         </div>
         <Button variant="primary" size="sm" onClick={() => navigate('/projects/new')}>+ New Project</Button>
       </div>
+
       {/* Stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
-        <StatCard label="Active Projects" value={1} sub="1 approaching deadline" />
-        <StatCard label="Tasks Complete" value={`${doneTasks}/${p.tasks.length}`} sub={`${activeTasks} in progress`} />
+        <StatCard
+          label="Active Projects"
+          value={apiAvailable ? activeCount : 1}
+          sub={atRiskCount > 0 ? `${atRiskCount} approaching deadline` : 'All on track'}
+        />
+        <StatCard
+          label="Tasks Complete"
+          value={`${doneTasks}/${totalTasks}`}
+          sub={`${activeTasks} in progress`}
+        />
         <StatCard label="Active Agents" value={3} sub="2 idle · 0 errors" />
-        <StatCard label="Risk Score" value={`${p.riskScore}%`} sub="Medium — 2 alerts open" />
+        <StatCard
+          label="Risk Score"
+          value={`${riskScore}%`}
+          sub="Medium — 2 alerts open"
+        />
       </div>
 
-      {/* Active projects */}
-      <h2 style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: 'var(--grey-900)' }}>Active Projects</h2>
-      <div
-        style={{ ...card, cursor: 'pointer', marginBottom: 24 }}
-        onClick={() => navigate('/projects/proj-001')}
-        onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--grey-400)'; }}
-        onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'; }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 600 }}>{p.name}</h3>
-              <Badge label="Active" variant="black" />
+      {/* Active Projects */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <h2 style={{ fontSize: 13, fontWeight: 600, color: 'var(--grey-900)' }}>Active Projects</h2>
+        {!apiAvailable && (
+          <span style={{ fontSize: 11, color: 'var(--text-3)', padding: '3px 8px', background: 'var(--grey-100)', borderRadius: 6 }}>
+            Demo mode — backend offline
+          </span>
+        )}
+      </div>
+
+      {loading ? (
+        <ProjectCardSkeleton />
+      ) : apiAvailable && rows.length > 0 ? (
+        // ── Real projects from API ───────────────────────────────────────────
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+          {rows.map(({ project, analytics }) => {
+            const progress = analytics?.completion_pct ?? 0;
+            const done = analytics?.task_stats?.done ?? 0;
+            const total = analytics?.total_tasks ?? 0;
+            const deadline = project.deadline_date
+              ? project.deadline_date.slice(0, 10)
+              : '—';
+
+            return (
+              <div
+                key={project.id}
+                style={{ ...card, cursor: 'pointer' }}
+                onClick={() => navigate(`/projects/${project.id}`)}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--grey-400)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'; }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 600 }}>{project.name}</h3>
+                      <Badge
+                        label={project.status === 'at_risk' ? 'At Risk' : project.status.charAt(0).toUpperCase() + project.status.slice(1)}
+                        variant={project.status === 'at_risk' ? 'black' : 'black'}
+                      />
+                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--grey-500)', maxWidth: 480 }}>
+                      {project.description ?? 'No description provided.'}
+                    </p>
+                  </div>
+                  <span style={{ fontSize: 12, color: 'var(--grey-400)', flexShrink: 0, marginLeft: 16 }}>
+                    Due {deadline}
+                  </span>
+                </div>
+
+                {/* Progress bar */}
+                <div style={{ marginBottom: total > 0 ? 14 : 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Progress</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--grey-700)' }}>{Math.round(progress)}%</span>
+                  </div>
+                  <div style={{ height: 4, background: 'var(--grey-150)', borderRadius: 2, overflow: 'hidden' }}>
+                    <div style={{ width: `${progress}%`, height: '100%', background: 'var(--grey-900)', transition: 'width 0.6s ease', borderRadius: 2 }} />
+                  </div>
+                </div>
+
+                {total > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                      {done} of {total} tasks done
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        // ── Fallback: mock project card ──────────────────────────────────────
+        <div
+          style={{ ...card, cursor: 'pointer', marginBottom: 24 }}
+          onClick={() => navigate('/projects/proj-001')}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--grey-400)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'; }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600 }}>{MOCK_PROJECT.name}</h3>
+                <Badge label="Active" variant="black" />
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--grey-500)', maxWidth: 480 }}>{MOCK_PROJECT.description}</p>
             </div>
-            <p style={{ fontSize: 12, color: 'var(--grey-500)', maxWidth: 480 }}>{p.description}</p>
+            <span style={{ fontSize: 12, color: 'var(--grey-400)', flexShrink: 0, marginLeft: 16 }}>Due {MOCK_PROJECT.deadline}</span>
           </div>
-          <span style={{ fontSize: 12, color: 'var(--grey-400)', flexShrink: 0, marginLeft: 16 }}>Due {p.deadline}</span>
-        </div>
 
-        {/* Progress bar */}
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Progress</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--grey-700)' }}>{p.progress}%</span>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Progress</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--grey-700)' }}>{MOCK_PROJECT.progress}%</span>
+            </div>
+            <div style={{ height: 4, background: 'var(--grey-150)', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{ width: `${MOCK_PROJECT.progress}%`, height: '100%', background: 'var(--grey-900)', transition: 'width 0.6s ease', borderRadius: 2 }} />
+            </div>
           </div>
-          <div style={{ height: 4, background: 'var(--grey-150)', borderRadius: 2, overflow: 'hidden' }}>
-            <div style={{ width: `${p.progress}%`, height: '100%', background: 'var(--grey-900)', transition: 'width 0.6s ease', borderRadius: 2 }} />
-          </div>
-        </div>
 
-        {/* Team */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {p.teamMembers.map(m => <MemberAvatar key={m.id} initials={m.initials} />)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {MOCK_PROJECT.teamMembers.map((m) => <MemberAvatar key={m.id} initials={m.initials} />)}
+            </div>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+              {MOCK_PROJECT.teamMembers.length} members · {mockDoneTasks} of {MOCK_PROJECT.tasks.length} tasks done
+            </span>
           </div>
-          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{p.teamMembers.length} members · {doneTasks} of {p.tasks.length} tasks done</span>
         </div>
-      </div>
+      )}
 
       {/* Recent activity */}
       <h2 style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: 'var(--grey-900)' }}>Recent Activity</h2>
