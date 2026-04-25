@@ -136,30 +136,34 @@ GLM is the reasoning core. If you remove it, the system loses its ability to int
            ▼
   ┌─────────────────────┐
   │  STAGE 1 — ANALYSE  │  InstructionAnalysisAgent
-  │                     │  Input:  document_text, doc_type
+  │                     │  Input:  document_text, document_type,
+  │                     │          project_id
   │  GLM extracts:      │  Output: structured_goals [ ]
-  │  • Goals            │          grading_priorities [ ]
+  │  • Goals            │          rubric_criteria [ ]
   │  • Rubric weights   │          ambiguities [ ]
   │  • Ambiguities      │          confidence_score
   │  • Implicit expects │          escalation_required
+  │                     │          escalation_reason (if low confidence)
   └────────┬────────────┘
            │ saves to project:state
            ▼
   ┌─────────────────────┐
   │  STAGE 2 — PLAN     │  PlanningAgent
   │                     │  Input:  structured_goals, team_size,
-  │  GLM generates:     │          deadline_date
+  │  GLM generates:     │          deadline_date, project_start_date,
+  │                     │          existing_tasks, days_available
   │  • Task list        │  Output: tasks [ ] with dependencies
   │  • Milestones       │          milestones [ ]
   │  • Critical path    │          critical_path [ ]
-  │  • Capacity check   │          capacity_analysis
+  │  • Capacity check   │          total_estimated_hours
+  │                     │          capacity_analysis, risk_flags [ ]
   └────────┬────────────┘
            │ saves tasks to project:state + DB
            ▼
   ┌─────────────────────┐
   │  STAGE 3 — COORD    │  CoordinationAgent
   │                     │  Input:  members, tasks,
-  │  GLM assigns:       │          activity_history
+  │  GLM assigns:       │          activity_history, project_phase
   │  • Roles            │  Output: role_assignments [ ]
   │  • Workload         │          meeting_agenda [ ]
   │  • Meeting agenda   │          fairness_index (0–1)
@@ -170,11 +174,13 @@ GLM is the reasoning core. If you remove it, the system loses its ability to int
   ┌─────────────────────┐
   │  STAGE 4 — MONITOR  │  RiskDetectionAgent  (runs continuously)
   │                     │  Input:  tasks, members,
-  │  GLM detects:       │          deadline_date, current_date
+  │  GLM detects:       │          deadline_date, current_date,
+  │                     │          project_id, decision_history
   │  • Deadline risk    │  Output: project_health
   │  • Inactivity       │          deadline_failure_probability
-  │  • Blockers         │          risks [ ]
+  │  • Blockers         │          identified_risks [ ]
   │  • Auto-recovery    │          auto_recovery_triggered
+  │                     │          recovery_urgency, inactivity_alert
   └────────┬────────────┘
            │  if auto_recovery_triggered → DeadlineRecovery
            ▼
@@ -182,10 +188,11 @@ GLM is the reasoning core. If you remove it, the system loses its ability to int
   │  STAGE 5 — VALIDATE │  SubmissionReadinessAgent
   │                     │  Input:  rubric_criteria,
   │  GLM checks:        │          completed_deliverables,
-  │  • Rubric coverage  │          uploaded_artefacts
+  │  • Rubric coverage  │          uploaded_artefacts, project_id
   │  • Missing items    │  Output: readiness_score (0–100)
   │  • Checklist        │          rubric_coverage [ ]
   │  • Recommendation   │          recommendation
+  │                     │          coverage_summary
   └─────────────────────┘
 ```
 
@@ -195,13 +202,15 @@ GLM is the reasoning core. If you remove it, the system loses its ability to int
 
 | Agent | Input Sources | GLM Output | Stored In |
 |---|---|---|---|
-| **A1** InstructionAnalysis | `documents.extracted_text` | `structured_goals`, `grading_priorities`, `ambiguities`, `confidence_score` | `project:state` |
-| **A2** Planning | `state.structured_goals`, `members` count, `deadline_date` | `tasks[]`, `milestones[]`, `critical_path[]`, `capacity_analysis` | `project:state` + `tasks` table |
-| **A3** Coordination | `state.tasks`, `members[]`, `activity:history` | `role_assignments[]`, `meeting_agenda[]`, `fairness_index` | `project:state` |
-| **A4** RiskDetection | `state.tasks`, `members.last_activity_at`, `deadline_date` | `project_health`, `failure_probability`, `risks[]`, `recovery_actions[]` | `project:state` |
-| **A5** SubmissionReadiness | `state.rubric_criteria`, `state.tasks[status=done]`, `uploaded_artefacts` | `readiness_score`, `rubric_coverage[]`, `checklist[]`, `recommendation` | `project:state` |
+| **A1** InstructionAnalysis | `document_text`, `document_type`, `project_id` | GLM JSON result + post-process fields: `escalation_required`, optional `escalation_reason` (set when `confidence_score < 0.6`) | `project:state` |
+| **A2** Planning | `structured_goals`, `team_size`, `deadline_date`, `project_start_date`, `existing_tasks`, `days_available` | `tasks[]`, `milestones[]`, `critical_path[]`, `total_estimated_hours`, `capacity_analysis`, `risk_flags[]` | `project:state` + `tasks` table |
+| **A3** Coordination | `members[]`, `tasks[]`, `activity_history`, `project_phase` | GLM JSON result + computed `fairness_index` from `role_assignments[].workload_hours` | `project:state` |
+| **A4** RiskDetection | `project_id`, `tasks[]`, `members[]`, `deadline_date`, `current_date`, `decision_history[]` | `project_health`, `deadline_failure_probability`, `identified_risks[]`, `inactive_members[]`, `auto_recovery_triggered`, `recovery_urgency`, `inactivity_alert` | `project:state` |
+| **A5** SubmissionReadiness | `rubric_criteria[]`, `completed_deliverables[]`, `uploaded_artefacts[]`, `project_id` | `readiness_score`, `rubric_coverage[]`, `checklist[]`, `recommendation`, `coverage_summary` | `project:state` |
 
 > Every agent also writes to `project:decisions:{id}` (Redis) and `decision_logs` (PostgreSQL) for full audit trail.
+>
+> Runtime note: each `execute()` call returns an envelope with `agent`, `status`, `result`, `executed_at`, and `duration_seconds`.
 
 ---
 
