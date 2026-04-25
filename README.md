@@ -6,11 +6,11 @@ Coordina AI is a stateful, multi-agent workflow system for student group project
 
 ## Deliverables 
 
+* Pitching Video: 
+* Pitch Deck: 
 * Product Requirement Document (PRD): 
 * System Analysis Document (SAD): 
 * Quality Assurance Testing Document (QATD): 
-* Pitch Deck: 
-* Demo Video: 
 
 ## Why it exists
 
@@ -23,6 +23,19 @@ Student collaboration usually breaks down because project information is scatter
 - generate submission readiness outputs
 
 GLM is the reasoning core. If you remove it, the system loses its ability to interpret requirements, plan work, and coordinate execution.
+
+## Target Users 
+
+### Primary Users
+
+- University students on group assignments.
+- Hackathon teams working under tight deadlines.
+- Team leads managing deliverables and timelines.
+
+### Secondary Users
+
+- Instructors reviewing team collaboration quality.
+- Research teams managing multi-phase projects.
 
 ## Core Capabilities
 
@@ -458,27 +471,27 @@ Pull Request to main → all gates must pass before merge
 
 ```text
 Coordina-AI/
-├── README.md
-├── validate_fixes.sh
-├── backend/
+├── README.md                                   # Root documentation and architecture guide
+├── validate_fixes.sh                           # Helper script to validate quick fixes
+├── backend/                                    # FastAPI backend + orchestration + agents
 │   ├── .env
 │   ├── .env.example
 │   ├── .gitignore
-│   ├── README.md
-│   ├── main.py
-│   ├── requirements.txt
-│   ├── agents/
+│   ├── README.md                               # Backend-specific setup and notes
+│   ├── main.py                                 # FastAPI app entrypoint
+│   ├── requirements.txt                        # Python dependencies
+│   ├── agents/                                 # Specialized workflow agents
 │   │   ├── __init__.py
-│   │   ├── base_agent.py
-│   │   ├── coordination_agent.py
-│   │   ├── instruction_analysis_agent.py
-│   │   ├── planning_agent.py
-│   │   ├── risk_detection_agent.py
-│   │   └── submission_readiness_agent.py
-│   ├── api/
+│   │   ├── base_agent.py                       # Shared agent execution and GLM wrapper
+│   │   ├── coordination_agent.py               # A3: role/workload/fairness coordination
+│   │   ├── instruction_analysis_agent.py       # A1: parse requirements and rubric signals
+│   │   ├── planning_agent.py                   # A2: tasks, milestones, dependency planning
+│   │   ├── risk_detection_agent.py             # A4: deadline/inactivity risk analysis
+│   │   └── submission_readiness_agent.py       # A5: submission readiness scoring
+│   ├── api/                                    # REST + WebSocket API layer
 │   │   ├── __init__.py
-│   │   ├── router.py
-│   │   ├── routes/
+│   │   ├── router.py                           # Top-level API router registration
+│   │   ├── routes/                             # Route modules by domain
 │   │   │   ├── __init__.py
 │   │   │   ├── agents.py
 │   │   │   ├── analytics.py
@@ -486,30 +499,30 @@ Coordina-AI/
 │   │   │   ├── projects.py
 │   │   │   ├── tasks.py
 │   │   │   ├── teams.py
-│   │   │   └── workflow.py
-│   │   └── websocket/
+│   │   │   └── workflow.py                     # Pipeline stage endpoints
+│   │   └── websocket/                          # Real-time workflow stream support
 │   │       ├── __init__.py
-│   │       ├── connection_manager.py
-│   │       └── workflow_stream.py
-│   ├── core/
+│   │       ├── connection_manager.py           # WebSocket client/session management
+│   │       └── workflow_stream.py              # Streams pipeline events to frontend
+│   ├── core/                                   # Shared infra: config, DB, logging, Redis
 │   │   ├── __init__.py
-│   │   ├── config.py
-│   │   ├── database.py
+│   │   ├── config.py                           # Environment and app settings
+│   │   ├── database.py                         # SQLAlchemy engine/session setup
 │   │   ├── exceptions.py
-│   │   ├── logger.py
+│   │   ├── logger.py                           # Centralized logging config
 │   │   ├── redis.py
-│   │   └── redis_client.py
-│   ├── edge_cases/
+│   │   └── redis_client.py                     # Redis connection and helper methods
+│   ├── edge_cases/                             # Recovery handlers for exceptional states
 │   │   ├── __init__.py
 │   │   ├── ambiguity_resolver.py
 │   │   ├── deadline_recovery.py
 │   │   ├── inactivity_detector.py
 │   │   └── missing_data_handler.py
-│   ├── glm/
+│   ├── glm/                                    # GLM client + reasoning orchestration
 │   │   ├── __init__.py
-│   │   ├── client.py
-│   │   ├── reasoning_engine.py
-│   │   └── prompts/
+│   │   ├── client.py                           # Z.AI API client abstraction
+│   │   ├── reasoning_engine.py                 # Prompt execution + response handling
+│   │   └── prompts/                            # Prompt templates per agent
 │   │       ├── __init__.py
 │   │       ├── base_system.txt
 │   │       ├── coordination.txt
@@ -518,13 +531,13 @@ Coordina-AI/
 │   │       ├── risk_detection.txt
 │   │       └── submission_readiness.txt
 │   ├── logs/
-│   ├── memory/
+│   ├── memory/                                 # Project activity + decision memory helpers
 │   │   ├── __init__.py
 │   │   ├── activity_tracker.py
 │   │   └── decision_log.py
-│   ├── migrations/
+│   ├── migrations/                             # Alembic migration environment
 │   │   └── env.py
-│   ├── models/
+│   ├── models/                                 # SQLAlchemy ORM models (source of schema)
 │   │   ├── __init__.py
 │   │   ├── accountability_pair.py
 │   │   ├── activity_event.py
@@ -544,19 +557,19 @@ Coordina-AI/
 │   │   ├── submission_report.py
 │   │   ├── task.py
 │   │   └── workflow_event.py
-│   ├── orchestrator/
+│   ├── orchestrator/                           # Workflow engine and routing logic
 │   │   ├── __init__.py
-│   │   ├── event_bus.py
-│   │   ├── state_manager.py
-│   │   ├── task_router.py
-│   │   └── workflow_engine.py
-│   ├── parsers/
+│   │   ├── event_bus.py                        # Publishes/subscribes internal workflow events
+│   │   ├── state_manager.py                    # Mutates and retrieves workflow state
+│   │   ├── task_router.py                      # Routes work across pipeline stages
+│   │   └── workflow_engine.py                  # Orchestrates end-to-end pipeline execution
+│   ├── parsers/                                # Converts unstructured inputs to text/structure
 │   │   ├── __init__.py
 │   │   ├── chat_logs_parser.py
 │   │   ├── document_parser.py
 │   │   ├── rubric_parser.py
 │   │   └── transcript_parser.py
-│   ├── schemas/
+│   ├── schemas/                                # Pydantic request/response contracts
 │   │   ├── __init__.py
 │   │   ├── document.py
 │   │   ├── member.py
@@ -564,9 +577,9 @@ Coordina-AI/
 │   │   ├── task.py
 │   │   └── workflow.py
 │   ├── scripts/
-│   │   └── smoke_test_glm.py
-│   └── tests/
-│       ├── conftest.py
+│   │   └── smoke_test_glm.py                   # Quick live connectivity test for GLM
+│   └── tests/                                  # Backend test suites
+│       ├── conftest.py                         # Shared pytest fixtures/setup
 │       ├── ai_output/
 │       │   ├── test_ai_output.py
 │       │   └── artifacts/
@@ -582,14 +595,14 @@ Coordina-AI/
 │       │   └── ...
 │       └── unit/
 │           └── ...
-└── coordina-ai/
+└── coordina-ai/                                # React + Vite frontend workspace
     ├── public/
-    └── src/
+    └── src/                                    # Application source
         ├── App.css
-        ├── App.tsx
+        ├── App.tsx                             # Root app shell and routing frame
         ├── index.css
-        ├── main.tsx
-        ├── api/
+        ├── main.tsx                            # Frontend bootstrap entrypoint
+        ├── api/                                # Typed API clients for backend routes
         │   ├── client.ts
         │   ├── documents.ts
         │   ├── mappers.ts
@@ -599,7 +612,7 @@ Coordina-AI/
         │   ├── types.ts
         │   └── workflow.ts
         ├── assets/
-        ├── components/
+        ├── components/                         # Reusable UI/layout components
         │   ├── layout/
         │   │   ├── Navbar.tsx
         │   │   └── PageLayout.tsx
@@ -608,10 +621,10 @@ Coordina-AI/
         │       └── Button.tsx
         ├── data/
         │   └── mockData.ts
-        ├── pages/
-        │   ├── DashboardPage.tsx
-        │   ├── NewProjectPage.tsx
-        │   └── ProjectWorkspacePage.tsx
+        ├── pages/                              # Top-level product screens
+        │   ├── DashboardPage.tsx               # Project health and progress overview
+        │   ├── NewProjectPage.tsx              # Project creation + initial input flow
+        │   └── ProjectWorkspacePage.tsx        # Core workspace: tasks, risks, readiness
         ├── types/
         │   └── index.ts
         └── utils/
@@ -765,13 +778,22 @@ Coordina AI currently supports these document types:
 5. Replan when conditions change
 6. Prepare submission output
 
-## Competition Framing
+## Contribution
 
-This project is designed for AI Systems & Agentic Workflow Automation. The key contribution is not just task automation, but an AI teammate that reasons over project state and orchestrates execution over time.
+Contributions are welcome.
 
-## Notes
+1. Fork the repository and create a feature branch.
+2. Make your changes with clear commits.
+3. Run relevant backend/frontend tests before submitting.
+4. Open a Pull Request with a concise summary, test notes, and screenshots (if UI changes).
 
-- The backend uses Redis-backed state and decision logging.
-- Several tests rely on the live GLM API and can be skipped when ZAI_API_KEY is unavailable.
-- The performance suite will fail fast if the backend server is not running.
+Please keep changes scoped, document any new environment variables, and update README sections when behavior changes.
+
+## License
+
+This project is licensed under the MIT License.
+
+See the `LICENSE` file at the repository root for the full text.
+
+
 
