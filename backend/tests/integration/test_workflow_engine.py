@@ -4,8 +4,24 @@ Integration tests for the full workflow pipeline.
 All external dependencies (GLM, Redis) are mocked.
 """
 
+import sys
+import types
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+# Provide a lightweight redis stub so the workflow engine can be imported
+# even when the optional redis package is not installed in the test runtime.
+if "redis" not in sys.modules:
+    redis_module = types.ModuleType("redis")
+    redis_asyncio_module = types.ModuleType("redis.asyncio")
+    class _RedisStub:
+        pass
+
+    redis_asyncio_module.Redis = _RedisStub
+    redis_module.asyncio = redis_asyncio_module
+    sys.modules["redis"] = redis_module
+    sys.modules["redis.asyncio"] = redis_asyncio_module
 
 from orchestrator.workflow_engine import WorkflowEngine
 from core.exceptions import WorkflowExecutionError
@@ -121,6 +137,22 @@ def make_engine_with_mocks():
     engine.state_manager.save = AsyncMock()
     engine.decision_logger.log = AsyncMock()
     engine.event_bus.publish = AsyncMock()
+    engine.deadline_recovery.generate_recovery_plan = AsyncMock(return_value={
+        "project_id": "proj-test",
+        "tasks_to_cut": [],
+        "tasks_to_compress": [],
+        "priority_order": [],
+        "recovery_message": "Recovery plan generated.",
+    })
+
+    # The workflow engine calls the module-level inactivity detector singleton,
+    # so mock it here to keep the integration tests fully isolated from Redis.
+    from orchestrator.workflow_engine import inactivity_detector
+    inactivity_detector.scan = AsyncMock(return_value={
+        "inactive_members": [],
+        "active_members": ["m1"],
+        "redistribution_needed": False,
+    })
 
     engine._agents["instruction_analysis"].execute = AsyncMock(return_value=MOCK_ANALYSIS_OUTPUT)
     engine._agents["planning"].execute = AsyncMock(return_value=MOCK_PLAN_OUTPUT)
