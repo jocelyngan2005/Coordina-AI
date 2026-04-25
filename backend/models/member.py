@@ -20,3 +20,4 @@ class Member(Base):
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     project: Mapped["Project"] = relationship(back_populates="members")
+    role_assignments: Mapped[list["RoleAssignment"]] = relationship(back_populates="member", cascade="all, delete-orphan")

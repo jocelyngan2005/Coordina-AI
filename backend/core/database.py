@@ -28,7 +28,26 @@ class Base(DeclarativeBase):
 
 async def init_db():
     """Create all tables on startup (dev only — use Alembic in production)."""
-    from models import project, task, member, document, decision_log, workflow_event  # noqa
+    from models import (  # noqa
+        project,
+        task,
+        member,
+        document,
+        decision_log,
+        workflow_event,
+        goal,
+        rubric,
+        milestone,
+        role_assignment,
+        contribution_balance,
+        meeting_agenda,
+        accountability_pair,
+        activity_event,
+        detected_risk,
+        risk_report,
+        submission_checklist,
+        submission_report,
+    )
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
