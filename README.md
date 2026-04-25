@@ -57,8 +57,8 @@ GLM is the reasoning core. If you remove it, the system loses its ability to int
 │                              FRONTEND (React + Vite)                        │
 │                                                                             │
 │   ┌──────────────┐  ┌──────────────┐  ┌───────────────┐  ┌─────────────┐    │
-│   │   Project    │  │  Task Board  │  │  Risk Panel   │  │  Decision   │    │
-│   │  Dashboard   │  │  (Kanban)    │  │  & Health     │  │  Audit Log  │    │
+│   │   Project    │  │  Task        │  │  Risk Panel   │  │  Decision   │    │
+│   │  Dashboard   │  │  Checklist   │  │  & Health     │  │  Audit Log  │    │
 │   └──────┬───────┘  └──────┬───────┘  └───────┬───────┘  └────────┬────┘    │
 │          └─────────────────┴──────────┬───────┘                   │         │
 │                                       │  REST + WebSocket         │         │
@@ -77,7 +77,7 @@ GLM is the reasoning core. If you remove it, the system loses its ability to int
                     │                                                          │
                     │   WorkflowEngine ──► TaskRouter ──► StateManager         │
                     │         │                                │               │
-                    │         └──────────► EventBus ◄─────────┘                │
+                    │         └──────────► EventBus ◄──────────┘               │
                     └────────────────────────┬─────────────────────────────────┘
                                              │  dispatches to
                        ┌─────────────────────┼─────────────────────────────────┐
@@ -211,6 +211,22 @@ GLM is the reasoning core. If you remove it, the system loses its ability to int
 
 ---
 
+### Agent Inputs & Outputs
+
+| Agent | Input Sources | GLM Output | Stored In |
+|---|---|---|---|
+| **A1** InstructionAnalysis | `document_text`, `document_type`, `project_id` | GLM JSON result + post-process fields: `escalation_required`, optional `escalation_reason` (set when `confidence_score < 0.6`) | `project:state` |
+| **A2** Planning | `structured_goals`, `team_size`, `deadline_date`, `project_start_date`, `existing_tasks`, `days_available` | `tasks[]`, `milestones[]`, `critical_path[]`, `total_estimated_hours`, `capacity_analysis`, `risk_flags[]` | `project:state` + `tasks` table |
+| **A3** Coordination | `members[]`, `tasks[]`, `activity_history`, `project_phase` | GLM JSON result + computed `fairness_index` from `role_assignments[].workload_hours` | `project:state` |
+| **A4** RiskDetection | `project_id`, `tasks[]`, `members[]`, `deadline_date`, `current_date`, `decision_history[]` | `project_health`, `deadline_failure_probability`, `identified_risks[]`, `inactive_members[]`, `auto_recovery_triggered`, `recovery_urgency`, `inactivity_alert` | `project:state` |
+| **A5** SubmissionReadiness | `rubric_criteria[]`, `completed_deliverables[]`, `uploaded_artefacts[]`, `project_id` | `readiness_score`, `rubric_coverage[]`, `checklist[]`, `recommendation`, `coverage_summary` | `project:state` |
+
+> Every agent also writes to `project:decisions:{id}` (Redis) and `decision_logs` (PostgreSQL) for full audit trail.
+>
+> Runtime note: each `execute()` call returns an envelope with `agent`, `status`, `result`, `executed_at`, and `duration_seconds`.
+
+---
+
 ### End-to-End Sequence Diagram (One User Flow)
 
 The flow below demonstrates one full interaction from project creation to submission readiness.
@@ -318,22 +334,6 @@ sequenceDiagram
 7. Real-time visibility and audit trail
   - WebSocket streams stage events to frontend while Redis and PostgreSQL persist state and decisions.
   - Feature demonstrated: live pipeline tracking, persistence, and explainable decision logging.
-
----
-
-### Agent Inputs & Outputs
-
-| Agent | Input Sources | GLM Output | Stored In |
-|---|---|---|---|
-| **A1** InstructionAnalysis | `document_text`, `document_type`, `project_id` | GLM JSON result + post-process fields: `escalation_required`, optional `escalation_reason` (set when `confidence_score < 0.6`) | `project:state` |
-| **A2** Planning | `structured_goals`, `team_size`, `deadline_date`, `project_start_date`, `existing_tasks`, `days_available` | `tasks[]`, `milestones[]`, `critical_path[]`, `total_estimated_hours`, `capacity_analysis`, `risk_flags[]` | `project:state` + `tasks` table |
-| **A3** Coordination | `members[]`, `tasks[]`, `activity_history`, `project_phase` | GLM JSON result + computed `fairness_index` from `role_assignments[].workload_hours` | `project:state` |
-| **A4** RiskDetection | `project_id`, `tasks[]`, `members[]`, `deadline_date`, `current_date`, `decision_history[]` | `project_health`, `deadline_failure_probability`, `identified_risks[]`, `inactive_members[]`, `auto_recovery_triggered`, `recovery_urgency`, `inactivity_alert` | `project:state` |
-| **A5** SubmissionReadiness | `rubric_criteria[]`, `completed_deliverables[]`, `uploaded_artefacts[]`, `project_id` | `readiness_score`, `rubric_coverage[]`, `checklist[]`, `recommendation`, `coverage_summary` | `project:state` |
-
-> Every agent also writes to `project:decisions:{id}` (Redis) and `decision_logs` (PostgreSQL) for full audit trail.
->
-> Runtime note: each `execute()` call returns an envelope with `agent`, `status`, `result`, `executed_at`, and `duration_seconds`.
 
 ---
 
@@ -768,15 +768,6 @@ Coordina AI currently supports these document types:
 - rubric
 - meeting_transcript
 - chat_logs
-
-## Agent Pipeline
-
-1. Interpret project requirements
-2. Create an execution workflow
-3. Allocate responsibilities
-4. Monitor progress and detect risk
-5. Replan when conditions change
-6. Prepare submission output
 
 ## Contribution
 
