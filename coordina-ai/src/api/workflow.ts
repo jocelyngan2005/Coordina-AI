@@ -13,6 +13,9 @@ export const workflowApi = {
       document_text: data.document_text,
       document_type: data.document_type ?? 'brief',
       deadline_date: data.deadline_date,
+      project_name: data.project_name,
+      team_size: data.team_size,
+      team_members: data.team_members,
     }),
 
   runRiskCheck: (projectId: string) =>
@@ -38,6 +41,9 @@ export const workflowApi = {
     url.searchParams.set('document_text', params.document_text);
     url.searchParams.set('document_type', params.document_type ?? 'brief');
     url.searchParams.set('deadline_date', params.deadline_date);
+    if (params.project_name) url.searchParams.set('project_name', params.project_name);
+    if (params.team_size) url.searchParams.set('team_size', String(params.team_size));
+    if (params.team_members) url.searchParams.set('team_members', JSON.stringify(params.team_members));
 
     const es = new EventSource(url.toString());
 

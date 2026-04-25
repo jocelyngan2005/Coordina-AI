@@ -17,6 +17,9 @@ class RunFullPipelineRequest(BaseModel):
     document_text: str
     document_type: str = "brief"  # "brief" | "rubric" | "meeting_transcript" | "chat_logs"
     deadline_date: str
+    project_name: Optional[str] = None  # e.g., "Smart Campus Navigation System"
+    team_size: Optional[int] = None  # Number of team members
+    team_members: Optional[list[dict[str, Any]]] = None  # [{"name": "...", "skills": ["..."]}, ...]
 
 
 class RunSubmissionCheckRequest(BaseModel):

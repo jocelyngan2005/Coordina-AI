@@ -149,13 +149,23 @@ class WorkflowEngine:
         if not state.get("structured_goals"):
             raise WorkflowExecutionError("Cannot plan: no structured goals found. Run analysis first.")
 
+        # Calculate team_size: prefer explicit value, fall back to members count
+        team_size = state.get("team_size") or len(state.get("members", [])) or 1
+
+        # Calculate days available until deadline
+        from datetime import datetime
+        today = datetime.now(timezone.utc).date()
+        deadline = datetime.fromisoformat(deadline_date).date() if deadline_date else today
+        days_available = max(1, (deadline - today).days)
+
         context = {
             "project_id": project_id,
             "structured_goals": state["structured_goals"],
-            "team_size": len(state.get("members", [])) or 1,
+            "team_size": team_size,
             "deadline_date": deadline_date,
-            "project_start_date": datetime.now(timezone.utc).date().isoformat(),
+            "project_start_date": state.get("project_start_date") or today.isoformat(),
             "existing_tasks": state.get("tasks", []),
+            "days_available": days_available,
         }
 
         output = await self._agents["planning"].execute(context)
@@ -328,13 +338,57 @@ class WorkflowEngine:
         document_text: str,
         document_type: str,
         deadline_date: str,
+        project_name: str = None,
+        team_size: int = None,
+        team_members: list[dict[str, Any]] = None,
     ) -> dict[str, Any]:
         """
         Run stages 1-4 in sequence.
         Returns a combined summary of all stage outputs.
+
+        Args:
+            project_id: Project identifier
+            document_text: Extracted/raw document text
+            document_type: "brief", "rubric", "meeting_transcript", "chat_logs"
+            deadline_date: ISO date string
+            project_name: Project name for context
+            team_size: Number of team members (overrides calculated from team_members)
+            team_members: List of {name, skills} dicts from frontend
         """
         logger.info(f"[WorkflowEngine] Starting full pipeline for project {project_id}")
 
+        # Get or initialize project state
+        state = await self.state_manager.get(project_id)
+
+        # Transform and store team metadata in the proper format for agents
+        if team_members:
+            # Convert frontend team_members format to agent-expected format
+            members = [
+                {
+                    "id": f"M{i+1}",  # Generate member IDs: M1, M2, M3, ...
+                    "name": member.get("name", f"Member {i+1}"),
+                    "skills": member.get("skills", []),
+                    "contribution_score": 0.0,  # Initial score
+                    "availability": "full-time",  # Default
+                    "experience_level": "mid",  # Default (will be inferred from context later)
+                }
+                for i, member in enumerate(team_members)
+            ]
+            state["members"] = members
+            state["team_size"] = len(members)
+        elif team_size:
+            # If only team_size is provided, store it
+            state["team_size"] = team_size
+
+        # Store other metadata
+        if project_name:
+            state["project_name"] = project_name
+        if deadline_date:
+            state["deadline_date"] = deadline_date
+
+        await self.state_manager.save(project_id, state)
+
+        # Run the full pipeline
         analysis = await self.run_analysis(project_id, document_text, document_type)
         plan = await self.run_planning(project_id, deadline_date)
         coordination = await self.run_coordination(project_id)
@@ -360,8 +414,41 @@ class WorkflowEngine:
         document_text: str,
         document_type: str,
         deadline_date: str,
+        project_name: str = None,
+        team_size: int = None,
+        team_members: list[dict[str, Any]] = None,
     ) -> AsyncGenerator[dict, None]:
         """Yield stage results as they complete for real-time frontend updates."""
+        # Get or initialize project state
+        state = await self.state_manager.get(project_id)
+
+        # Transform and store team metadata in the proper format for agents
+        if team_members:
+            # Convert frontend team_members format to agent-expected format
+            members = [
+                {
+                    "id": f"M{i+1}",  # Generate member IDs: M1, M2, M3, ...
+                    "name": member.get("name", f"Member {i+1}"),
+                    "skills": member.get("skills", []),
+                    "contribution_score": 0.0,  # Initial score
+                    "availability": "full-time",  # Default
+                    "experience_level": "mid",  # Default
+                }
+                for i, member in enumerate(team_members)
+            ]
+            state["members"] = members
+            state["team_size"] = len(members)
+        elif team_size:
+            state["team_size"] = team_size
+
+        # Store other metadata
+        if project_name:
+            state["project_name"] = project_name
+        if deadline_date:
+            state["deadline_date"] = deadline_date
+
+        await self.state_manager.save(project_id, state)
+
         stages = [
             ("analysis",    lambda: self.run_analysis(project_id, document_text, document_type)),
             ("planning",    lambda: self.run_planning(project_id, deadline_date)),

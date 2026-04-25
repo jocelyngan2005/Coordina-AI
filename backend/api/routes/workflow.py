@@ -110,6 +110,9 @@ async def run_full_pipeline(
             document_text=payload.document_text,
             document_type=payload.document_type,
             deadline_date=payload.deadline_date,
+            project_name=payload.project_name,
+            team_size=payload.team_size,
+            team_members=payload.team_members,
         )
     except WorkflowExecutionError as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -134,17 +137,31 @@ async def stream_pipeline(
     document_text: str,
     document_type: str,
     deadline_date: str,
+    project_name: str = None,
+    team_size: int = None,
+    team_members: str = None,  # JSON string from query param
 ):
     """
     SSE endpoint: streams pipeline stage results as they complete.
     Frontend can render each stage progressively.
     """
+    # Parse team_members JSON from query string
+    parsed_team_members = None
+    if team_members:
+        try:
+            parsed_team_members = json.loads(team_members)
+        except json.JSONDecodeError:
+            pass
+
     async def event_generator():
         async for stage_result in workflow_engine.stream_pipeline(
             project_id=project_id,
             document_text=document_text,
             document_type=document_type,
             deadline_date=deadline_date,
+            project_name=project_name,
+            team_size=team_size,
+            team_members=parsed_team_members,
         ):
             yield f"data: {json.dumps(stage_result)}\n\n"
         yield "data: [DONE]\n\n"

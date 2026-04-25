@@ -94,34 +94,88 @@ export function mapProject(
  * Map GLM planning agent tasks to frontend Task[].
  * GLM tasks use snake_case and arrays for assigned_to.
  */
+/**
+ * Infer phase from task title/description if not explicitly provided.
+ * Fallback when backend AI output is missing the phase field.
+ */
+function inferPhase(title: string, description: string): Task['phase'] | undefined {
+  const text = `${title} ${description}`.toLowerCase();
+  const phasePatterns: Record<Exclude<Task['phase'], undefined>, string[]> = {
+    setup: ['setup', 'initialize', 'install', 'configure', 'scaffold'],
+    design: ['design', 'plan', 'architect', 'wireframe', 'schema'],
+    implementation: ['implement', 'build', 'develop', 'code', 'create', 'api', 'feature'],
+    testing: ['test', 'qa', 'verify', 'validate', 'check', 'debug'],
+    documentation: ['document', 'readme', 'guide', 'spec', 'report', 'write'],
+  };
+
+  for (const [phase, keywords] of Object.entries(phasePatterns)) {
+    if (keywords.some((kw) => text.includes(kw))) {
+      return phase as Task['phase'];
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Map GLM planning agent tasks to frontend Task[].
+ * Handles snake_case backend fields and converts to camelCase frontend types.
+ *
+ * Backend field mapping:
+ * - assigned_to (array) → assignedTo + assigneeId (first element)
+ * - startDate/start_date → startDate
+ * - endDate/end_date → dueDate (duration field for UI)
+ * - phase → phase + tags (phase becomes a tag)
+ * - dependencies → dependsOn (renamed per Task interface)
+ * - percentage_utilized → percentage_utilized
+ */
 export function mapTasks(glmTasks: Record<string, unknown>[]): Task[] {
   const validStatuses = ['pending', 'backlog', 'in_progress', 'done'] as const;
   const validPhases = ['setup', 'design', 'implementation', 'testing', 'documentation'] as const;
+  const validPriorities = ['high', 'medium', 'low'] as const;
 
   return glmTasks.map((t, i) => {
+    // Validate and normalize status
     const rawStatus = String(t.status ?? 'pending');
     const status = (validStatuses.includes(rawStatus as Task['status']) ? rawStatus : 'pending') as Task['status'];
 
-    const rawPhase = String(t.phase ?? '');
-    const phase = (validPhases.includes(rawPhase as Task['phase']) ? rawPhase : undefined) as Task['phase'] | undefined;
+    // Extract and validate phase
+    const rawPhase = String(t.phase ?? '').toLowerCase();
+    const explicitPhase = validPhases.includes(rawPhase as any)
+      ? (rawPhase as Task['phase'])
+      : undefined;
 
+    // Fallback: infer phase from title/description if not explicitly provided
+    const title = String(t.title ?? '');
+    const description = String(t.description ?? '');
+    const phase = explicitPhase || inferPhase(title, description);
+
+    // Handle assigned_to: can be array or single value
     const assignedTo = Array.isArray(t.assigned_to)
-      ? (t.assigned_to as unknown[]).map(String)
+      ? (t.assigned_to as unknown[]).map(String).filter(Boolean)
       : t.assigned_to
       ? [String(t.assigned_to)]
       : [];
 
+    // Validate priority
+    const rawPriority = String(t.priority ?? 'medium').toLowerCase();
+    const priority = (validPriorities.includes(rawPriority as Task['priority']) ? rawPriority : 'medium') as Task['priority'];
+
+    // Extract dependencies: maps backend 'dependencies' → frontend 'dependsOn'
+    const dependsOn = Array.isArray(t.dependencies)
+      ? (t.dependencies as unknown[]).map(String).filter(Boolean)
+      : [];
+
     return {
       id: String(t.id ?? t.task_id ?? `t${i + 1}`),
-      title: String(t.title ?? ''),
-      description: String(t.description ?? ''),
+      title,
+      description,
       status,
-      priority: (['high', 'medium', 'low'].includes(String(t.priority)) ? t.priority : 'medium') as Task['priority'],
+      priority,
       estimated_hours: Number(t.estimated_hours ?? 0),
       phase,
       startDate: isoToDate(String(t.startDate ?? t.start_date ?? '')),
       dueDate: isoToDate(String(t.endDate ?? t.end_date ?? t.dueDate ?? '')),
-      dependencies: Array.isArray(t.dependencies) ? (t.dependencies as unknown[]).map(String) : [],
+      dependsOn,  // ← Renamed from 'dependencies' to match Task interface
       assigneeId: assignedTo[0],
       assignedTo,
       tags: phase ? [phase] : [],

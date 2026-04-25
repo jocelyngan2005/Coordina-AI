@@ -144,6 +144,12 @@ export default function NewProjectPage() {
         document_text: documentText,
         document_type: 'brief',
         deadline_date: deadline || new Date().toISOString().slice(0, 10),
+        project_name: projectName || 'Untitled Project',
+        team_size: parsedMembers.length,
+        team_members: parsedMembers.map((m) => ({
+          name: m.name,
+          skills: m.role ? [m.role] : [],
+        })),
       });
 
       // ── Done ──────────────────────────────────────────────────────────────

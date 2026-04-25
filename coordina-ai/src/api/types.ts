@@ -93,4 +93,7 @@ export interface RunPipelineRequest {
   document_text: string;
   document_type?: string;
   deadline_date: string;
+  project_name?: string;
+  team_size?: number;
+  team_members?: Array<{ name: string; skills: string[] }>;
 }
