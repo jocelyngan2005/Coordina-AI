@@ -65,24 +65,24 @@ GLM is the reasoning core. If you remove it, the system loses its ability to int
                     │   WorkflowEngine ──► TaskRouter ──► StateManager         │
                     │         │                                │               │
                     │         └──────────► EventBus ◄─────────┘                │
-                    └──────────┬───────────────────────────────────────────────┘
-                               │  dispatches to
-         ┌─────────────────────┼─────────────────────────────────┐
-         │                     │  AGENT LAYER                    │
-         │                     │                                 │
-         │   ┌─────────────────▼──────────────────────────────┐  │
-         │   │              BaseAgent (abstract)              │  │
-         │   └─────┬──────┬──────┬──────┬──────┬──────────────┘  │
-         │         │      │      │      │      │                 │
-         │      ┌──▼──┐ ┌─▼──┐ ┌─▼──┐ ┌─▼──┐ ┌─▼───┐             │
-         │      │ A1  │ │ A2 │ │ A3 │ │ A4 │ │ A5  │             │
-         │      │Inst │ │Plan│ │Cord│ │Risk│ │Subm │             │
-         │      └──┬──┘ └─┬──┘ └┬───┘ └┬───┘ └┬────┘             │
-         │         └──────┴─────┴──────┴──────┘                  │
-         │                       │  every agent calls            │
-         └───────────────────────┼───────────────────────────────┘
-                                 │
-                    ┌────────────▼────────────────────────────────────────────┐
+                    └────────────────────────┬─────────────────────────────────┘
+                                             │  dispatches to
+                       ┌─────────────────────┼─────────────────────────────────┐
+                       │                     │  AGENT LAYER                    │
+                       │                     │                                 │
+                       │   ┌─────────────────▼──────────────────────────────┐  │
+                       │   │              BaseAgent (abstract)              │  │
+                       │   └─────┬──────┬──────┬──────┬──────┬──────────────┘  │
+                       │         │      │      │      │      │                 │
+                       │      ┌──▼──┐ ┌─▼──┐ ┌─▼──┐ ┌─▼──┐ ┌─▼───┐             │
+                       │      │ A1  │ │ A2 │ │ A3 │ │ A4 │ │ A5  │             │
+                       │      │Inst │ │Plan│ │Cord│ │Risk│ │Subm │             │
+                       │      └──┬──┘ └─┬──┘ └┬───┘ └┬───┘ └┬────┘             │
+                       │         └──────┴─────┴──────┴──────┘                  │
+                       │                       │  every agent calls            │
+                       └───────────────────────┼───────────────────────────────┘
+                                               │
+                    ┌──────────────────────────▼──────────────────────────────┐
                     │              GLM REASONING ENGINE                       │
                     │                                                         │
                     │   ReasoningEngine                                       │
@@ -195,6 +195,116 @@ GLM is the reasoning core. If you remove it, the system loses its ability to int
   │                     │          coverage_summary
   └─────────────────────┘
 ```
+
+---
+
+### End-to-End Sequence Diagram (One User Flow)
+
+The flow below demonstrates one full interaction from project creation to submission readiness.
+
+```mermaid
+sequenceDiagram
+   autonumber
+   actor U as Student Team Lead
+   participant FE as Frontend (React)
+   participant API as FastAPI Routes
+   participant ORCH as WorkflowEngine
+   participant PARSE as Parsers
+   participant A1 as InstructionAnalysisAgent
+   participant A2 as PlanningAgent
+   participant A3 as CoordinationAgent
+   participant A4 as RiskDetectionAgent
+   participant A5 as SubmissionReadinessAgent
+   participant GLM as GLM Reasoning Engine
+   participant R as Redis
+   participant DB as PostgreSQL
+   participant WS as WebSocket Stream
+
+   U->>FE: Create project and upload brief + rubric
+   FE->>API: POST /api/projects, POST /api/documents
+   API->>DB: Persist project and documents metadata
+   API->>PARSE: Extract text from uploaded files
+   PARSE-->>API: normalized document_text + document_type
+
+   U->>FE: Run workflow pipeline
+   FE->>API: POST /api/workflow/{project_id}/run-pipeline
+   API->>ORCH: start pipeline(project_id)
+   ORCH->>WS: publish stage=start
+
+   ORCH->>A1: execute(document_text, document_type, project_id)
+   A1->>GLM: reason(prompt=instruction_analysis)
+   GLM-->>A1: structured_goals, rubric_criteria, ambiguities, confidence_score
+   A1->>R: update project:state:{id}
+   A1->>DB: write decision_logs
+   A1-->>ORCH: analysis result
+   ORCH->>WS: publish stage=analyse_complete
+
+   ORCH->>A2: execute(structured_goals, team_size, deadline_date,...)
+   A2->>GLM: reason(prompt=planning)
+   GLM-->>A2: tasks, milestones, critical_path
+   A2->>R: update tasks/milestones in project:state:{id}
+   A2->>DB: upsert tasks, write decision_logs
+   A2-->>ORCH: plan result + capacity_analysis + risk_flags
+   ORCH->>WS: publish stage=plan_complete
+
+   ORCH->>A3: execute(members, tasks, activity_history, project_phase)
+   A3->>GLM: reason(prompt=coordination)
+   GLM-->>A3: role_assignments, meeting_agenda, accountability_pairs
+   A3->>R: update coordination outputs
+   A3->>DB: write decision_logs
+   A3-->>ORCH: coordination result + fairness_index
+   ORCH->>WS: publish stage=coordinate_complete
+
+   ORCH->>A4: execute(project_id, tasks, members, deadline_date, current_date,...)
+   A4->>GLM: reason(prompt=risk_detection)
+   GLM-->>A4: project_health, deadline_failure_probability, risks/inactive_members
+   A4->>R: update risk status and alerts
+   A4->>DB: persist detected_risks/risk_reports + decision_logs
+   A4-->>ORCH: risk result + auto_recovery_triggered + recovery_urgency
+   ORCH->>WS: publish stage=risk_check_complete
+
+   ORCH->>A5: execute(rubric_criteria, completed_deliverables, uploaded_artefacts, project_id)
+   A5->>GLM: reason(prompt=submission_readiness)
+   GLM-->>A5: readiness_score, rubric_coverage, checklist, recommendation
+   A5->>R: update readiness snapshot
+   A5->>DB: persist submission_checklists/submission_reports + decision_logs
+   A5-->>ORCH: submission result + coverage_summary
+   ORCH->>WS: publish stage=submission_check_complete
+
+   ORCH-->>API: final pipeline result
+   API-->>FE: 200 OK + aggregated outputs
+   FE-->>U: Dashboard shows tasks, risks, and readiness score
+```
+
+### Step-by-Step Feature Demonstration
+
+1. Project intake and document ingestion
+  - User creates a project and uploads brief/rubric files.
+  - System features demonstrated: project management, document ingestion, parser pipeline.
+
+2. Requirement understanding (A1)
+  - System converts raw text into structured goals, rubric criteria, ambiguity signals, and confidence.
+  - Feature demonstrated: instruction analysis and ambiguity detection.
+
+3. Execution planning (A2)
+  - System produces task graph, milestones, critical path, and capacity warnings.
+  - Feature demonstrated: automated planning and dependency-aware scheduling.
+
+4. Team coordination (A3)
+  - System assigns roles, balances workload, builds meeting agenda, and computes fairness index.
+  - Feature demonstrated: role allocation and accountability support.
+
+5. Continuous risk monitoring (A4)
+  - System evaluates deadline risk and inactivity, then triggers recovery urgency when needed.
+  - Feature demonstrated: proactive risk detection and recovery signaling.
+
+6. Submission readiness validation (A5)
+  - System scores readiness, checks rubric coverage, and outputs checklist and recommendation.
+  - Feature demonstrated: rubric-based submission quality control.
+
+7. Real-time visibility and audit trail
+  - WebSocket streams stage events to frontend while Redis and PostgreSQL persist state and decisions.
+  - Feature demonstrated: live pipeline tracking, persistence, and explainable decision logging.
 
 ---
 
