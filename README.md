@@ -6,7 +6,7 @@ Coordina AI is a stateful, multi-agent workflow system for student group project
 
 ## Deliverables 
 
-* Pitching Video: 
+* Pitching Video: [Click here](https://youtu.be/Vq5QyEgo3C4)
 * Pitch Deck: [Click here](https://drive.google.com/file/d/1KMpg7B9_b4oS4YDCgVmtsOgEKhhEnQOm/view?usp=sharing)
 * Product Requirement Document (PRD): [Click here](https://drive.google.com/file/d/1dygc7xrELOBPbaYsgtwdlFPWuYubrRIi/view?usp=sharing)
 * System Analysis Document (SAD): [Click here](https://drive.google.com/file/d/1KJYphgDKD6bp9uBak2-qy4zHDSvBJfuk/view?usp=sharing)
