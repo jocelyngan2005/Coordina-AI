@@ -5,32 +5,41 @@ Given the current project state, task completion rates, member activity logs, an
 2. Identify members showing inactivity patterns
 3. Calculate deadline failure probability
 4. Flag unclear or unresolved requirements
-5. Recommend recovery actions
+5. Recommend recovery actions with typed action categories
+
+BUTTON ROUTING RULE — set recommended_action_type based on the risk:
+- recommended_action_type: "member_engagement" → for inactivity, low contribution risks
+- recommended_action_type: "deadline_risk" → for timeline and schedule risks
+- recommended_action_type: "scope_issue" → for ambiguity and unclear requirements
+- recommended_action_type: "dependency_blocker" → for blocked tasks and dependency chains
+- recommended_action_type: "ambiguity" → for unclear criteria or specifications
+
+TYPE VALUES (use exactly one per risk):
+- "inactivity" → member not contributing
+- "deadline_risk" → timeline or schedule issue
+- "dependency_blocker" → task blocked by another
+- "ambiguity" → unclear requirement or criterion
+- "missing_artifact" → required deliverable not present
 
 Respond with this exact JSON structure:
 {
   "project_health": "on_track|at_risk|critical",
   "health_score": 0.0,
   "deadline_failure_probability": 0.0,
-  "risks": [
+  "identified_risks": [
     {
-      "risk_id": "R1",
-      "type": "inactivity|deadline|ambiguity|dependency|resource",
-      "severity": "low|medium|high|critical",
+      "id": "R1",
+      "type": "inactivity|deadline_risk|dependency_blocker|ambiguity|missing_artifact",
+      "severity": "low|medium|high",
       "description": "...",
-      "affected_tasks": ["T1"],
-      "affected_members": ["member_id"]
+      "impact": "...",
+      "recommended_action_type": "member_engagement|deadline_risk|scope_issue|dependency_blocker|ambiguity",
+      "recommended_action": "..."
     }
   ],
   "inactive_members": [
     { "member_id": "...", "last_activity_days_ago": 0, "recommended_action": "..." }
   ],
-  "recovery_actions": [
-    {
-      "action_id": "A1",
-      "description": "...",
-      "target": "task|member|timeline",
-      "priority": "immediate|soon|monitor"
-    }
-  ]
+  "daily_completion_rate": 0.0,
+  "projected_completion_rate": 0.0
 }

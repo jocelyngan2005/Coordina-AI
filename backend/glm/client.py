@@ -35,11 +35,14 @@ class GLMClient:
         messages: list[dict],
         system_prompt: str | None = None,
         temperature: float = 0.3,
-        max_tokens: int = 4096,
+        max_tokens: int = 10000,
     ) -> str:
         """
         Send a chat request to the GLM model.
         Returns the assistant's text response.
+        
+        Note: max_tokens set to 10000 for complex agents with large responses
+        (planning decomposes to 13+ tasks with detailed descriptions).
         """
         payload_messages = []
         if system_prompt:

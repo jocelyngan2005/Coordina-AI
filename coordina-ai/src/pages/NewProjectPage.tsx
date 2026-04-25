@@ -6,7 +6,7 @@ import { teamsApi } from '../api/teams';
 import { documentsApi } from '../api/documents';
 import { workflowApi } from '../api/workflow';
 
-type DocType = 'brief' | 'rubric' | 'transcript' | 'chat_log';
+type DocType = 'brief' | 'rubric' | 'meeting_transcript' | 'chat_logs';
 
 interface UploadedFile {
   name: string;
@@ -19,8 +19,8 @@ interface UploadedFile {
 const docTypeLabels: Record<DocType, string> = {
   brief: 'Project Brief',
   rubric: 'Rubric',
-  transcript: 'Meeting Transcript',
-  chat_log: 'Chat Log',
+  meeting_transcript: 'Meeting Transcript',
+  chat_logs: 'Chat Logs',
 };
 
 const steps = ['Upload Documents', 'Team & Timeline', 'AI Ingestion'];

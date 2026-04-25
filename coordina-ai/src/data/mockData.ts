@@ -1,4 +1,4 @@
-import type { Project, Agent, RiskAlert, RubricItem } from '../types';
+import type { Project, Agent, RiskAlert, RubricItem, Task } from '../types';
 
 export const MOCK_PROJECT: Project = {
   id: 'proj-001',
@@ -17,18 +17,18 @@ export const MOCK_PROJECT: Project = {
     { id: 'm5', name: 'Mei Tanaka', role: 'UX Designer', initials: 'MT', contributionScore: 80, lastActive: '3 hours ago', taskCount: 4 },
   ],
   tasks: [
-    { id: 't1', title: 'Define BLE beacon placement strategy', status: 'done', assigneeId: 'm1', startDate: '2026-04-01', dueDate: '2026-04-10', priority: 'high', tags: ['hardware', 'planning'], description: 'Map optimal beacon positions for 90% indoor coverage.', aiConfidence: 85 },
-    { id: 't2', title: 'Set up computer vision pipeline', status: 'done', assigneeId: 'm2', startDate: '2026-04-03', dueDate: '2026-04-12', priority: 'high', tags: ['AI', 'core'], description: 'Implement YOLOv8 for landmark recognition.', dependsOn: ['t1'], aiConfidence: 95 },
-    { id: 't3', title: 'Design user journey flows', status: 'done', assigneeId: 'm5', startDate: '2026-04-05', dueDate: '2026-04-14', priority: 'medium', tags: ['UX'], description: 'Wireframes for onboarding and navigation.', aiConfidence: 70 },
-    { id: 't4', title: 'Build REST API for location data', status: 'in_progress', assigneeId: 'm4', startDate: '2026-04-15', dueDate: '2026-04-28', priority: 'high', tags: ['backend', 'API'], description: 'FastAPI endpoints for real-time location queries.', dependsOn: ['t1', 't2'], aiConfidence: 90 },
-    { id: 't5', title: 'Implement navigation UI', status: 'in_progress', assigneeId: 'm3', startDate: '2026-04-18', dueDate: '2026-05-01', priority: 'high', tags: ['frontend'], description: 'AR overlay navigation view in React Native.', dependsOn: ['t3', 't4'], aiConfidence: 88 },
-    { id: 't6', title: 'Train room classification model', status: 'in_progress', assigneeId: 'm2', startDate: '2026-04-14', dueDate: '2026-04-30', priority: 'high', tags: ['AI', 'ML'], description: 'Dataset curation and model training.', dependsOn: ['t2'], aiConfidence: 92 },
-    { id: 't7', title: 'Write system architecture document', status: 'in_progress', assigneeId: 'm1', startDate: '2026-04-16', dueDate: '2026-04-25', priority: 'medium', tags: ['docs'], description: 'Complete technical specification.', aiConfidence: 75 },
-    { id: 't8', title: 'Conduct usability testing session', status: 'in_progress', assigneeId: 'm5', startDate: '2026-04-20', dueDate: '2026-04-26', priority: 'medium', tags: ['UX', 'testing'], description: '3 rounds with 5 participants each.', dependsOn: ['t3'], aiConfidence: 68 },
-    { id: 't9', title: 'Integration testing — full system', status: 'backlog', assigneeId: 'm4', startDate: '2026-05-02', dueDate: '2026-05-08', priority: 'high', tags: ['testing'], description: 'End-to-end test all subsystems.', dependsOn: ['t4', 't5', 't6'], aiConfidence: 94 },
-    { id: 't10', title: 'Prepare final presentation slides', status: 'backlog', assigneeId: 'm1', startDate: '2026-05-09', dueDate: '2026-05-12', priority: 'medium', tags: ['deliverable'], description: '15-slide deck for project showcase.', dependsOn: ['t9'], aiConfidence: 60 },
-    { id: 't11', title: 'Write rubric reflection report', status: 'backlog', assigneeId: 'm3', startDate: '2026-05-10', dueDate: '2026-05-13', priority: 'medium', tags: ['docs'], description: 'Self-assessment against grading rubric.', dependsOn: ['t9'], aiConfidence: 72 },
-  ],
+    { id: 't1', title: 'Define BLE beacon placement strategy', status: 'done', assigneeId: 'm1', assignedTo: ['m1'], startDate: '2026-04-01', dueDate: '2026-04-10', priority: 'high', phase: 'setup', tags: ['setup'], description: 'Map optimal beacon positions for 90% indoor coverage.', aiConfidence: 85 },
+    { id: 't2', title: 'Set up computer vision pipeline', status: 'done', assigneeId: 'm2', assignedTo: ['m2'], startDate: '2026-04-03', dueDate: '2026-04-12', priority: 'high', phase: 'implementation', tags: ['implementation'], description: 'Implement YOLOv8 for landmark recognition.', dependsOn: ['t1'], aiConfidence: 95 },
+    { id: 't3', title: 'Design user journey flows', status: 'done', assigneeId: 'm5', assignedTo: ['m5'], startDate: '2026-04-05', dueDate: '2026-04-14', priority: 'medium', phase: 'design', tags: ['design'], description: 'Wireframes for onboarding and navigation.', aiConfidence: 70 },
+    { id: 't4', title: 'Build REST API for location data', status: 'in_progress', assigneeId: 'm4', assignedTo: ['m4'], startDate: '2026-04-15', dueDate: '2026-04-28', priority: 'high', phase: 'implementation', tags: ['implementation'], description: 'FastAPI endpoints for real-time location queries.', dependsOn: ['t1', 't2'], aiConfidence: 90 },
+    { id: 't5', title: 'Implement navigation UI', status: 'in_progress', assigneeId: 'm3', assignedTo: ['m3'], startDate: '2026-04-18', dueDate: '2026-05-01', priority: 'high', phase: 'implementation', tags: ['implementation'], description: 'AR overlay navigation view in React Native.', dependsOn: ['t3', 't4'], aiConfidence: 88 },
+    { id: 't6', title: 'Train room classification model', status: 'in_progress', assigneeId: 'm2', assignedTo: ['m2'], startDate: '2026-04-14', dueDate: '2026-04-30', priority: 'high', phase: 'implementation', tags: ['implementation'], description: 'Dataset curation and model training.', dependsOn: ['t2'], aiConfidence: 92 },
+    { id: 't7', title: 'Write system architecture document', status: 'in_progress', assigneeId: 'm1', assignedTo: ['m1'], startDate: '2026-04-16', dueDate: '2026-04-25', priority: 'medium', phase: 'documentation', tags: ['documentation'], description: 'Complete technical specification.', aiConfidence: 75 },
+    { id: 't8', title: 'Conduct usability testing session', status: 'in_progress', assigneeId: 'm5', assignedTo: ['m5'], startDate: '2026-04-20', dueDate: '2026-04-26', priority: 'medium', phase: 'testing', tags: ['testing'], description: '3 rounds with 5 participants each.', dependsOn: ['t3'], aiConfidence: 68 },
+    { id: 't9', title: 'Integration testing — full system', status: 'backlog', assigneeId: 'm4', assignedTo: ['m4'], startDate: '2026-05-02', dueDate: '2026-05-08', priority: 'high', phase: 'testing', tags: ['testing'], description: 'End-to-end test all subsystems.', dependsOn: ['t4', 't5', 't6'], aiConfidence: 94 },
+    { id: 't10', title: 'Prepare final presentation slides', status: 'backlog', assigneeId: 'm1', assignedTo: ['m1'], startDate: '2026-05-09', dueDate: '2026-05-12', priority: 'medium', phase: 'documentation', tags: ['documentation'], description: '15-slide deck for project showcase.', dependsOn: ['t9'], aiConfidence: 60 },
+    { id: 't11', title: 'Write rubric reflection report', status: 'backlog', assigneeId: 'm3', assignedTo: ['m3'], startDate: '2026-05-10', dueDate: '2026-05-13', priority: 'medium', phase: 'documentation', tags: ['documentation'], description: 'Self-assessment against grading rubric.', dependsOn: ['t9'], aiConfidence: 72 },
+  ] as Task[],
 };
 
 export const MOCK_AGENTS: Agent[] = [
@@ -109,14 +109,18 @@ export const MOCK_RISKS: RiskAlert[] = [
     detail: 'Assigned task "Build REST API for location data" has had no commit or progress update in 28 hours. Deadline is April 28.',
     timestamp: '2 mins ago',
     memberId: 'm4',
+    recommended_action_type: 'member_engagement',
+    recommended_action: 'Send a reminder to Sam and consider reassigning blocked subtasks.',
   },
   {
     id: 'r2',
-    type: 'deadline',
+    type: 'deadline_risk',
     severity: 'medium',
     message: 'API integration at risk of missing April 28 deadline',
     detail: 'Current task velocity suggests the REST API task will not be complete until May 1 at current pace. 3-day buffer consumed.',
     timestamp: '10 mins ago',
+    recommended_action_type: 'deadline_risk',
+    recommended_action: 'Adjust timeline or escalate to project supervisor.',
   },
   {
     id: 'r3',
@@ -125,6 +129,8 @@ export const MOCK_RISKS: RiskAlert[] = [
     message: 'Rubric criterion 7 is ambiguous',
     detail: '"Real-world applicability" in the rubric has no measurable definition. GLM flagged this as potentially subjective. Recommend requesting clarification from supervisor.',
     timestamp: '1 hour ago',
+    recommended_action_type: 'scope_issue',
+    recommended_action: 'Request clarification from supervisor on evaluation criteria.',
   },
   {
     id: 'r4',
@@ -133,6 +139,8 @@ export const MOCK_RISKS: RiskAlert[] = [
     message: 'Test report artifact not detected',
     detail: 'Rubric requires a formal test report document. No file matching this description has been uploaded or linked.',
     timestamp: '6 hours ago',
+    recommended_action_type: 'scope_issue',
+    recommended_action: 'Assign a team member to create the test report.',
   },
 ];
 

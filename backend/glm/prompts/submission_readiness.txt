@@ -7,21 +7,33 @@ Given the project rubric, list of completed deliverables, and uploaded artefacts
 4. Produce a readiness score out of 100
 5. Flag any last-minute risks
 
+SCORING RULES:
+For each rubric criterion, provide:
+- criterion_id: unique identifier (e.g., "C1", "C2")
+- criterion_name: human-readable name of the criterion
+- maxScore: total possible points for this criterion (derive from weight_pct, e.g., weight_pct=25 means maxScore=25)
+- score: points earned so far based on evidence (must be <= maxScore)
+- weight: decimal percentage of total grade (e.g., 25% weight → 0.25)
+- status: "covered" if fully addressed, "partial" if incomplete, "missing" if not addressed
+
 Respond with this exact JSON structure:
 {
   "readiness_score": 0,
   "rubric_coverage": [
     {
-      "criterion": "...",
-      "weight_pct": 0,
-      "status": "complete|partial|missing",
+      "criterion_id": "C1",
+      "criterion_name": "...",
+      "maxScore": 25,
+      "score": 18,
+      "weight": 0.25,
+      "status": "covered|partial|missing",
       "evidence": "...",
-      "notes": "..."
+      "feedback": "..."
     }
   ],
   "missing_artefacts": ["..."],
   "submission_checklist": [
-    { "item": "...", "status": "done|pending|blocked", "owner": "..." }
+    { "item": "...", "status": "complete|in_progress|pending", "priority": "high|medium|low" }
   ],
   "last_minute_risks": ["..."],
   "recommendation": "ready_to_submit|needs_work|not_ready"

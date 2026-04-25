@@ -58,4 +58,8 @@ class RiskDetectionAgent(BaseAgent):
         inactive = result.get("inactive_members", [])
         result["inactivity_alert"] = len(inactive) > 0
 
+        # Ensure identified_risks field exists (normalise from legacy "risks" key)
+        if "identified_risks" not in result and "risks" in result:
+            result["identified_risks"] = result.pop("risks")
+
         return result

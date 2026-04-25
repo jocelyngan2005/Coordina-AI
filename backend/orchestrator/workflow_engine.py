@@ -201,6 +201,7 @@ class WorkflowEngine:
         self._raise_on_agent_error(output, "coordination")
 
         state["role_assignments"] = output["result"].get("role_assignments", [])
+        state["contribution_balance"] = output["result"].get("contribution_balance", [])
         state["meeting_agenda"] = output["result"].get("meeting_agenda", [])
         state["workflow_stage"] = "coordinated"
         await self.state_manager.save(project_id, state)

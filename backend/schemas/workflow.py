@@ -15,7 +15,7 @@ class RunPlanningRequest(BaseModel):
 
 class RunFullPipelineRequest(BaseModel):
     document_text: str
-    document_type: str = "brief"
+    document_type: str = "brief"  # "brief" | "rubric" | "meeting_transcript" | "chat_logs"
     deadline_date: str
 
 

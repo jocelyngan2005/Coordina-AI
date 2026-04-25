@@ -39,7 +39,7 @@ class SubmissionReadinessAgent(BaseAgent):
         # Summary stats
         coverage = result.get("rubric_coverage", [])
         result["coverage_summary"] = {
-            "complete": sum(1 for c in coverage if c.get("status") == "complete"),
+            "covered": sum(1 for c in coverage if c.get("status") == "covered"),
             "partial": sum(1 for c in coverage if c.get("status") == "partial"),
             "missing": sum(1 for c in coverage if c.get("status") == "missing"),
             "total": len(coverage),
