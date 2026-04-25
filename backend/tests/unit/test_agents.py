@@ -135,15 +135,15 @@ AMBIGUOUS_ANALYSIS = {
 
 GOOD_PLAN = {
     "tasks": [
-        {"task_id": "T1", "title": "DB schema",    "description": "Design schema",
+        {"id": "T1", "title": "DB schema",    "description": "Design schema",
          "estimated_hours": 3,  "priority": "critical", "dependencies": [],     "milestone_id": "M1"},
-        {"task_id": "T2", "title": "API endpoints","description": "Build API",
+        {"id": "T2", "title": "API endpoints","description": "Build API",
          "estimated_hours": 6,  "priority": "high",     "dependencies": ["T1"], "milestone_id": "M1"},
-        {"task_id": "T3", "title": "GLM hookup",   "description": "Integrate GLM",
+        {"id": "T3", "title": "GLM hookup",   "description": "Integrate GLM",
          "estimated_hours": 8,  "priority": "critical", "dependencies": ["T2"], "milestone_id": "M2"},
-        {"task_id": "T4", "title": "Frontend",     "description": "React UI",
+        {"id": "T4", "title": "Frontend",     "description": "React UI",
          "estimated_hours": 6,  "priority": "high",     "dependencies": ["T2"], "milestone_id": "M2"},
-        {"task_id": "T5", "title": "Write report", "description": "Documentation",
+        {"id": "T5", "title": "Write report", "description": "Documentation",
          "estimated_hours": 4,  "priority": "medium",   "dependencies": [],     "milestone_id": "M3"},
     ],
     "milestones": [
@@ -209,9 +209,9 @@ CRITICAL_RISK = {
 GOOD_SUBMISSION = {
     "readiness_score": 88,
     "rubric_coverage": [
-        {"criterion": "System Architecture", "weight_pct": 30, "status": "complete",
+        {"criterion": "System Architecture", "weight_pct": 30, "status": "covered",
          "evidence": "diagram.png submitted", "notes": ""},
-        {"criterion": "Code Quality",        "weight_pct": 25, "status": "complete",
+        {"criterion": "Code Quality",        "weight_pct": 25, "status": "covered",
          "evidence": "Code reviewed",         "notes": ""},
         {"criterion": "Documentation",       "weight_pct": 20, "status": "partial",
          "evidence": "README exists",          "notes": "Needs API docs"},
@@ -578,8 +578,8 @@ class TestRiskDetectionAgent:
         agent = RiskDetectionAgent()
         with patch.object(agent, "_reason", new=AsyncMock(return_value=HIGH_RISK)):
             output = await agent.execute(risk_context)
-        assert len(output["result"]["risks"]) == 1
-        assert output["result"]["risks"][0]["risk_id"] == "R1"
+        assert len(output["result"]["identified_risks"]) == 1
+        assert output["result"]["identified_risks"][0]["risk_id"] == "R1"
 
     @pytest.mark.asyncio
     async def test_recovery_actions_preserved(self, risk_context):
@@ -658,7 +658,7 @@ class TestSubmissionReadinessAgent:
         with patch.object(agent, "_reason", new=AsyncMock(return_value=GOOD_SUBMISSION)):
             output = await agent.execute(submission_context)
         summary = output["result"]["coverage_summary"]
-        assert summary["complete"] == 2
+        assert summary["covered"] == 2
         assert summary["partial"] == 1
         assert summary["missing"] == 0
         assert summary["total"] == 3

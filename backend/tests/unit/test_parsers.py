@@ -5,15 +5,18 @@ Unit tests for all parser modules:
   - DocumentParser  (PDF, DOCX, TXT)
   - RubricParser
   - TranscriptParser
-  - ChatLogParser
+    - ChatLogsParser
 """
 
 import pytest
+import sys
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from parsers.document_parser import DocumentParser
 from parsers.rubric_parser import RubricParser
-from parsers.transcript_parser import TranscriptParser, ChatLogParser
+from parsers.transcript_parser import TranscriptParser
+from parsers.chat_logs_parser import ChatLogsParser
 
 
 # ================================================================== #
@@ -85,7 +88,8 @@ class TestDocumentParser:
         mock_reader = MagicMock()
         mock_reader.pages = [mock_page1, mock_page2]
 
-        with patch("PyPDF2.PdfReader", return_value=mock_reader):
+        fake_pypdf2 = SimpleNamespace(PdfReader=MagicMock(return_value=mock_reader))
+        with patch.dict(sys.modules, {"PyPDF2": fake_pypdf2}):
             result = parser._extract_pdf(b"fake pdf")
 
         assert "Page one content" in result
@@ -104,7 +108,8 @@ class TestDocumentParser:
         mock_reader = MagicMock()
         mock_reader.pages = [mock_page1, mock_page2]
 
-        with patch("PyPDF2.PdfReader", return_value=mock_reader):
+        fake_pypdf2 = SimpleNamespace(PdfReader=MagicMock(return_value=mock_reader))
+        with patch.dict(sys.modules, {"PyPDF2": fake_pypdf2}):
             result = parser._extract_pdf(b"fake pdf")
 
         assert "Valid content" in result
@@ -124,7 +129,8 @@ class TestDocumentParser:
         mock_doc = MagicMock()
         mock_doc.paragraphs = [mock_p1, mock_p2, mock_p3]
 
-        with patch("docx.Document", return_value=mock_doc):
+        fake_docx = SimpleNamespace(Document=MagicMock(return_value=mock_doc))
+        with patch.dict(sys.modules, {"docx": fake_docx}):
             result = parser._extract_docx(b"fake docx")
 
         assert "First paragraph." in result
@@ -292,10 +298,10 @@ class TestTranscriptParser:
 
 
 # ================================================================== #
-#  ChatLogParser                                                       #
+#  ChatLogsParser                                                      #
 # ================================================================== #
 
-class TestChatLogParser:
+class TestChatLogsParser:
 
     WHATSAPP_LOG = """
 [01/11/2025, 10:00:00] Alice: Hey everyone, meeting in 5?
@@ -312,60 +318,60 @@ class TestChatLogParser:
     """
 
     def test_whatsapp_format_parses_correctly(self):
-        parser = ChatLogParser()
+        parser = ChatLogsParser()
         result = parser.parse(self.WHATSAPP_LOG)
         assert len(result["turns"]) == 5
 
     def test_whatsapp_format_extracts_speakers(self):
-        parser = ChatLogParser()
+        parser = ChatLogsParser()
         result = parser.parse(self.WHATSAPP_LOG)
         assert "Alice" in result["speakers"]
         assert "Bob" in result["speakers"]
         assert "Carol" in result["speakers"]
 
     def test_whatsapp_format_speaker_order(self):
-        parser = ChatLogParser()
+        parser = ChatLogsParser()
         result = parser.parse(self.WHATSAPP_LOG)
         assert result["speakers"][0] == "Alice"
 
     def test_simple_format_parses_correctly(self):
-        parser = ChatLogParser()
+        parser = ChatLogsParser()
         result = parser.parse(self.SIMPLE_LOG)
         assert len(result["turns"]) == 3
 
     def test_simple_format_extracts_speakers(self):
-        parser = ChatLogParser()
+        parser = ChatLogsParser()
         result = parser.parse(self.SIMPLE_LOG)
         assert "Alice" in result["speakers"]
         assert "Bob" in result["speakers"]
 
     def test_message_content_preserved(self):
-        parser = ChatLogParser()
+        parser = ChatLogsParser()
         result = parser.parse(self.WHATSAPP_LOG)
         texts = [t["text"] for t in result["turns"]]
         assert any("GLM agent" in t for t in texts)
 
     def test_cleaned_text_contains_all_messages(self):
-        parser = ChatLogParser()
+        parser = ChatLogsParser()
         result = parser.parse(self.WHATSAPP_LOG)
         assert "GLM agent setup" in result["cleaned_text"]
         assert "planning agent" in result["cleaned_text"]
 
     def test_empty_log_returns_empty_structures(self):
-        parser = ChatLogParser()
+        parser = ChatLogsParser()
         result = parser.parse("")
         assert result["turns"] == []
         assert result["speakers"] == []
 
     def test_unrecognised_lines_skipped(self):
         """Lines that don't match any pattern should be silently ignored."""
-        parser = ChatLogParser()
+        parser = ChatLogsParser()
         text = "This is not a chat message\nNeither is this"
         result = parser.parse(text)
         assert result["turns"] == []
 
     def test_duplicate_speakers_not_duplicated_in_speakers_list(self):
-        parser = ChatLogParser()
+        parser = ChatLogsParser()
         result = parser.parse(self.WHATSAPP_LOG)
         # Alice appears 2x but should only appear once in speakers list
         assert result["speakers"].count("Alice") == 1

@@ -20,9 +20,18 @@ class ChatLogsParser:
     Returns structured turns with speaker and message content.
     """
 
-    # Matches timestamps in various formats: [12:34], (12:34), 12:34, etc.
-    TIMESTAMP_PATTERN = re.compile(r"[\[\(]?\d{1,2}:\d{2}(?::\d{2})?[\]\)]?\s*")
-    
+    # Matches common chat export prefixes:
+    # - [01/11/2025, 10:00:00]
+    # - [10:00]
+    # - 10:00 -
+    # - 10:00:00
+    PREFIX_PATTERN = re.compile(
+        r"^\s*(?:"
+        r"\[\d{1,2}/\d{1,2}/\d{2,4},\s*\d{1,2}:\d{2}(?::\d{2})?\]\s*|"
+        r"\[?\d{1,2}:\d{2}(?::\d{2})?\]?\s*-?\s*"
+        r")"
+    )
+
     # Matches speaker patterns: "User:", "@User:", "User (timestamp):"
     SPEAKER_PATTERN = re.compile(r"^[@]?([a-zA-Z0-9\-_.]+)\s*(?:\([^)]*\))?\s*:\s*")
 
@@ -38,7 +47,7 @@ class ChatLogsParser:
         }
         """
         turns = []
-        current_speaker = "Unknown"
+        current_speaker = None
         current_lines = []
 
         for line in raw_text.splitlines():
@@ -46,8 +55,8 @@ class ChatLogsParser:
             if not line:
                 continue
 
-            # Remove leading timestamps
-            line = self.TIMESTAMP_PATTERN.sub("", line).strip()
+            # Remove leading timestamps / export prefixes
+            line = self.PREFIX_PATTERN.sub("", line).strip()
             
             # Try to match speaker pattern
             speaker_match = self.SPEAKER_PATTERN.match(line)
@@ -55,7 +64,7 @@ class ChatLogsParser:
                 # Save previous speaker's turn
                 if current_lines:
                     turns.append({
-                        "speaker": current_speaker,
+                        "speaker": current_speaker or "Unknown",
                         "text": " ".join(current_lines)
                     })
                 
@@ -64,13 +73,15 @@ class ChatLogsParser:
                 remaining = line[speaker_match.end():].strip()
                 current_lines = [remaining] if remaining else []
             else:
-                # Continuation of previous speaker's message
-                current_lines.append(line)
+                # Continuation of previous speaker's message; ignore stray lines
+                # that appear before the first recognized speaker.
+                if current_speaker is not None:
+                    current_lines.append(line)
 
         # Save last speaker's turn
         if current_lines:
             turns.append({
-                "speaker": current_speaker,
+                "speaker": current_speaker or "Unknown",
                 "text": " ".join(current_lines)
             })
 
