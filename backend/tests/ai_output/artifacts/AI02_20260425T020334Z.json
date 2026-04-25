@@ -1,0 +1,350 @@
+{
+  "case_id": "AI02",
+  "agent": "planning",
+  "recorded_at": "2026-04-25T02:03:34.345530+00:00",
+  "input": {
+    "project_id": "ai-test-02",
+    "structured_goals": [
+      {
+        "goal_id": "G1",
+        "statement": "Build React + FastAPI prototype",
+        "priority": "critical"
+      },
+      {
+        "goal_id": "G2",
+        "statement": "Integrate Z.AI GLM reasoning engine",
+        "priority": "critical"
+      },
+      {
+        "goal_id": "G3",
+        "statement": "Write 3000-word technical report",
+        "priority": "high"
+      },
+      {
+        "goal_id": "G4",
+        "statement": "Prepare architecture document",
+        "priority": "high"
+      },
+      {
+        "goal_id": "G5",
+        "statement": "Record 10-minute demo video",
+        "priority": "medium"
+      }
+    ],
+    "team_size": 4,
+    "deadline_date": "2025-12-01",
+    "project_start_date": "2025-11-17",
+    "existing_tasks": [],
+    "days_available": 14
+  },
+  "output": {
+    "agent": "planning",
+    "status": "success",
+    "result": {
+      "tasks": [
+        {
+          "id": "T1",
+          "title": "Setup project scaffolding",
+          "description": "Initialize React and FastAPI project structure, configure dev environment, setup version control",
+          "estimated_hours": 6,
+          "phase": "setup",
+          "priority": "high",
+          "dependencies": [],
+          "assigned_to": [
+            "M1"
+          ],
+          "startDate": "2025-11-17",
+          "endDate": "2025-11-17",
+          "status": "pending",
+          "percentage_utilized": 100
+        },
+        {
+          "id": "T2",
+          "title": "Implement FastAPI backend endpoints",
+          "description": "Build core REST API endpoints, data models, and middleware for the prototype",
+          "estimated_hours": 18,
+          "phase": "implementation",
+          "priority": "critical",
+          "dependencies": [
+            "T1"
+          ],
+          "assigned_to": [
+            "M1"
+          ],
+          "startDate": "2025-11-18",
+          "endDate": "2025-11-20",
+          "status": "pending",
+          "percentage_utilized": 100
+        },
+        {
+          "id": "T3",
+          "title": "Build React frontend components",
+          "description": "Develop UI components, state management, and user interaction flows",
+          "estimated_hours": 18,
+          "phase": "implementation",
+          "priority": "critical",
+          "dependencies": [
+            "T1"
+          ],
+          "assigned_to": [
+            "M2"
+          ],
+          "startDate": "2025-11-18",
+          "endDate": "2025-11-20",
+          "status": "pending",
+          "percentage_utilized": 100
+        },
+        {
+          "id": "T4",
+          "title": "Connect frontend to backend",
+          "description": "Integrate React frontend with FastAPI backend, implement API calls and error handling",
+          "estimated_hours": 12,
+          "phase": "implementation",
+          "priority": "critical",
+          "dependencies": [
+            "T2",
+            "T3"
+          ],
+          "assigned_to": [
+            "M1",
+            "M2"
+          ],
+          "startDate": "2025-11-21",
+          "endDate": "2025-11-22",
+          "status": "pending",
+          "percentage_utilized": 50
+        },
+        {
+          "id": "T5",
+          "title": "Research Z.AI GLM API and authentication",
+          "description": "Study GLM reasoning engine API docs, authentication flow, and request/response formats",
+          "estimated_hours": 6,
+          "phase": "setup",
+          "priority": "high",
+          "dependencies": [],
+          "assigned_to": [
+            "M3"
+          ],
+          "startDate": "2025-11-17",
+          "endDate": "2025-11-17",
+          "status": "pending",
+          "percentage_utilized": 100
+        },
+        {
+          "id": "T6",
+          "title": "Implement GLM reasoning engine integration",
+          "description": "Build integration layer for Z.AI GLM reasoning engine, implement API client and data transformation",
+          "estimated_hours": 18,
+          "phase": "implementation",
+          "priority": "critical",
+          "dependencies": [
+            "T5",
+            "T1"
+          ],
+          "assigned_to": [
+            "M3"
+          ],
+          "startDate": "2025-11-18",
+          "endDate": "2025-11-20",
+          "status": "pending",
+          "percentage_utilized": 100
+        },
+        {
+          "id": "T7",
+          "title": "Test and validate reasoning outputs",
+          "description": "End-to-end testing of GLM integration, validate reasoning accuracy and system reliability",
+          "estimated_hours": 12,
+          "phase": "testing",
+          "priority": "critical",
+          "dependencies": [
+            "T6",
+            "T4"
+          ],
+          "assigned_to": [
+            "M3"
+          ],
+          "startDate": "2025-11-23",
+          "endDate": "2025-11-24",
+          "status": "pending",
+          "percentage_utilized": 100
+        },
+        {
+          "id": "T8",
+          "title": "Outline technical report structure",
+          "description": "Define report sections, key findings to cover, and data points from testing phase",
+          "estimated_hours": 4,
+          "phase": "documentation",
+          "priority": "medium",
+          "dependencies": [],
+          "assigned_to": [
+            "M4"
+          ],
+          "startDate": "2025-11-21",
+          "endDate": "2025-11-21",
+          "status": "pending",
+          "percentage_utilized": 67
+        },
+        {
+          "id": "T9",
+          "title": "Write technical report content",
+          "description": "Compose 3000-word technical report covering methodology, results, and analysis",
+          "estimated_hours": 18,
+          "phase": "documentation",
+          "priority": "high",
+          "dependencies": [
+            "T8",
+            "T7"
+          ],
+          "assigned_to": [
+            "M4"
+          ],
+          "startDate": "2025-11-25",
+          "endDate": "2025-11-27",
+          "status": "pending",
+          "percentage_utilized": 100
+        },
+        {
+          "id": "T10",
+          "title": "Design system architecture",
+          "description": "Create architecture diagrams, define component relationships and data flows",
+          "estimated_hours": 12,
+          "phase": "design",
+          "priority": "high",
+          "dependencies": [],
+          "assigned_to": [
+            "M4"
+          ],
+          "startDate": "2025-11-17",
+          "endDate": "2025-11-18",
+          "status": "pending",
+          "percentage_utilized": 100
+        },
+        {
+          "id": "T11",
+          "title": "Write architecture document",
+          "description": "Document system architecture, technology choices, and design decisions",
+          "estimated_hours": 12,
+          "phase": "documentation",
+          "priority": "high",
+          "dependencies": [
+            "T10"
+          ],
+          "assigned_to": [
+            "M4"
+          ],
+          "startDate": "2025-11-19",
+          "endDate": "2025-11-20",
+          "status": "pending",
+          "percentage_utilized": 100
+        },
+        {
+          "id": "T12",
+          "title": "Prepare demo script and scenarios",
+          "description": "Write demo script, define showcase scenarios, and prepare test data for recording",
+          "estimated_hours": 6,
+          "phase": "documentation",
+          "priority": "medium",
+          "dependencies": [
+            "T4"
+          ],
+          "assigned_to": [
+            "M2"
+          ],
+          "startDate": "2025-11-23",
+          "endDate": "2025-11-23",
+          "status": "pending",
+          "percentage_utilized": 100
+        },
+        {
+          "id": "T13",
+          "title": "Record and edit demo video",
+          "description": "Record 10-minute demonstration video and perform post-production editing",
+          "estimated_hours": 12,
+          "phase": "documentation",
+          "priority": "medium",
+          "dependencies": [
+            "T12"
+          ],
+          "assigned_to": [
+            "M2"
+          ],
+          "startDate": "2025-11-24",
+          "endDate": "2025-11-25",
+          "status": "pending",
+          "percentage_utilized": 100
+        }
+      ],
+      "milestones": [
+        {
+          "milestone_id": "MS1",
+          "title": "Project Setup Complete",
+          "due_date": "2025-11-17",
+          "tasks": [
+            "T1",
+            "T5"
+          ]
+        },
+        {
+          "milestone_id": "MS2",
+          "title": "Architecture & Design Complete",
+          "due_date": "2025-11-20",
+          "tasks": [
+            "T10",
+            "T11"
+          ]
+        },
+        {
+          "milestone_id": "MS3",
+          "title": "Core Implementation Complete",
+          "due_date": "2025-11-22",
+          "tasks": [
+            "T2",
+            "T3",
+            "T4",
+            "T6"
+          ]
+        },
+        {
+          "milestone_id": "MS4",
+          "title": "Testing & Validation Complete",
+          "due_date": "2025-11-24",
+          "tasks": [
+            "T7"
+          ]
+        },
+        {
+          "milestone_id": "MS5",
+          "title": "All Deliverables Complete",
+          "due_date": "2025-11-27",
+          "tasks": [
+            "T8",
+            "T9",
+            "T12",
+            "T13"
+          ]
+        }
+      ],
+      "critical_path": [
+        "T1",
+        "T2",
+        "T4",
+        "T7",
+        "T9"
+      ],
+      "total_estimated_hours": 154,
+      "risk_flags": [
+        "Critical path ends Nov 27 with only 3 days buffer before deadline",
+        "GLM reasoning engine integration depends on external API availability and stability",
+        "M4 has heavy documentation load across architecture doc, technical report, and report outline",
+        "T7 testing depends on both backend-frontend integration and GLM integration completing on time"
+      ],
+      "capacity_analysis": {
+        "total_estimated_hours": 154,
+        "team_capacity_hours": 112,
+        "overloaded": true
+      }
+    },
+    "executed_at": "2026-04-25T02:02:49.756749+00:00",
+    "duration_seconds": 44.588781
+  }
+}

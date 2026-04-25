@@ -1,0 +1,68 @@
+{
+  "case_id": "AI05",
+  "agent": "instruction_analysis",
+  "recorded_at": "2026-04-25T02:04:33.078087+00:00",
+  "input": {
+    "project_id": "ai-test-05",
+    "document_text": "Make something for students.",
+    "document_type": "brief"
+  },
+  "output": {
+    "agent": "instruction_analysis",
+    "status": "success",
+    "result": {
+      "document_type": "brief",
+      "deliverables": [
+        {
+          "id": "D1",
+          "title": "Unspecified Student Product",
+          "description": "A deliverable intended for students, though the exact nature, format, and scope are undefined.",
+          "weight_pct": 100
+        }
+      ],
+      "grading_priorities": [],
+      "implicit_expectations": [
+        "The product must be relevant to student needs or pain points.",
+        "The product should be accessible and usable by the target student demographic.",
+        "The deliverable must be a completed, functional output rather than just a concept."
+      ],
+      "ambiguities": [
+        {
+          "issue": "The phrase 'Make something' provides no specification on the format, medium, or scope of the deliverable.",
+          "suggested_clarification": "Specify the type of product to be created (e.g., mobile app, web platform, study guide, physical tool)."
+        },
+        {
+          "issue": "The target audience 'students' is too broad and lacks demographic specifics.",
+          "suggested_clarification": "Define the specific student audience (e.g., K-12, university, medical students, engineering students) and their context."
+        },
+        {
+          "issue": "No deadlines, constraints, or success metrics are provided.",
+          "suggested_clarification": "Establish a project timeline, budget/tech constraints, and clear success criteria."
+        }
+      ],
+      "structured_goals": [
+        {
+          "goal_id": "G1",
+          "statement": "Define the specific target student demographic and their core needs.",
+          "priority": "high"
+        },
+        {
+          "goal_id": "G2",
+          "statement": "Determine the format and core features of the product to be built.",
+          "priority": "high"
+        },
+        {
+          "goal_id": "G3",
+          "statement": "Develop and deliver the final product for the students.",
+          "priority": "medium"
+        }
+      ],
+      "confidence_score": 0.1,
+      "source_notes": "Extremely vague brief; no specific sections, speakers, or details to note.",
+      "escalation_required": true,
+      "escalation_reason": "Low confidence in requirement extraction. Manual review or clarification recommended."
+    },
+    "executed_at": "2026-04-25T02:04:21.120627+00:00",
+    "duration_seconds": 11.953683
+  }
+}

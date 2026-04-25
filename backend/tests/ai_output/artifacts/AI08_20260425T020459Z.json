@@ -1,0 +1,143 @@
+{
+  "case_id": "AI08",
+  "agent": "submission_readiness",
+  "recorded_at": "2026-04-25T02:04:59.108574+00:00",
+  "input": {
+    "project_id": "ai-test-08",
+    "rubric_criteria": [
+      {
+        "criterion": "System Architecture & Design",
+        "weight_pct": 30
+      },
+      {
+        "criterion": "Code Quality & Modularity",
+        "weight_pct": 25
+      },
+      {
+        "criterion": "AI Integration Depth",
+        "weight_pct": 20
+      },
+      {
+        "criterion": "Documentation",
+        "weight_pct": 15
+      },
+      {
+        "criterion": "Presentation",
+        "weight_pct": 10
+      }
+    ],
+    "completed_deliverables": [
+      "Web prototype"
+    ],
+    "uploaded_artefacts": [
+      "prototype.zip"
+    ]
+  },
+  "output": {
+    "agent": "submission_readiness",
+    "status": "success",
+    "result": {
+      "readiness_score": 20,
+      "rubric_coverage": [
+        {
+          "criterion_id": "C1",
+          "criterion_name": "System Architecture & Design",
+          "maxScore": 30,
+          "score": 8,
+          "weight": 0.3,
+          "status": "partial",
+          "evidence": "Web prototype uploaded (prototype.zip), but no architecture diagrams or design documents provided.",
+          "feedback": "Upload system architecture diagrams, design rationale, and tech stack documentation to substantiate the prototype."
+        },
+        {
+          "criterion_id": "C2",
+          "criterion_name": "Code Quality & Modularity",
+          "maxScore": 25,
+          "score": 12,
+          "weight": 0.25,
+          "status": "partial",
+          "evidence": "prototype.zip likely contains source code, but no code quality reports, repo link, or structure overview is available for review.",
+          "feedback": "Provide a link to the Git repository and include linting/test reports to demonstrate code quality and modularity."
+        },
+        {
+          "criterion_id": "C3",
+          "criterion_name": "AI Integration Depth",
+          "maxScore": 20,
+          "score": 0,
+          "weight": 0.2,
+          "status": "missing",
+          "evidence": "No artefacts or deliverables explicitly demonstrate AI integration.",
+          "feedback": "Include API configurations, model training scripts, prompt engineering logs, or other evidence of AI implementation."
+        },
+        {
+          "criterion_id": "C4",
+          "criterion_name": "Documentation",
+          "maxScore": 15,
+          "score": 0,
+          "weight": 0.15,
+          "status": "missing",
+          "evidence": "No README, API documentation, or user manuals have been uploaded.",
+          "feedback": "Create comprehensive documentation including setup instructions, API references, and user guides."
+        },
+        {
+          "criterion_id": "C5",
+          "criterion_name": "Presentation",
+          "maxScore": 10,
+          "score": 0,
+          "weight": 0.1,
+          "status": "missing",
+          "evidence": "No slide decks, pitch videos, or presentation materials submitted.",
+          "feedback": "Prepare and upload a presentation deck or recorded demo video summarizing the project."
+        }
+      ],
+      "missing_artefacts": [
+        "System architecture diagrams",
+        "Source code repository link or extracted code structure",
+        "AI integration evidence (scripts, API configs, model details)",
+        "Project documentation (README, setup guide, API docs)",
+        "Presentation deck or video"
+      ],
+      "submission_checklist": [
+        {
+          "item": "Upload System Architecture & Design Documents",
+          "status": "pending",
+          "priority": "high"
+        },
+        {
+          "item": "Provide Source Code Repository Access",
+          "status": "in_progress",
+          "priority": "high"
+        },
+        {
+          "item": "Add AI Integration Evidence",
+          "status": "pending",
+          "priority": "high"
+        },
+        {
+          "item": "Write Project Documentation (README, API Docs)",
+          "status": "pending",
+          "priority": "high"
+        },
+        {
+          "item": "Create Presentation Deck / Demo Video",
+          "status": "pending",
+          "priority": "medium"
+        }
+      ],
+      "last_minute_risks": [
+        "Submitting only the prototype.zip will result in an automatic zero for 45% of the rubric (Documentation and Presentation).",
+        "Lack of explicit AI integration evidence risks a zero for the AI Integration Depth criterion (20% of the total grade).",
+        "Evaluators cannot assess Code Quality & Modularity reliably from a zipped prototype alone without repo context or reports."
+      ],
+      "recommendation": "not_ready",
+      "coverage_summary": {
+        "covered": 0,
+        "partial": 2,
+        "missing": 3,
+        "total": 5
+      }
+    },
+    "executed_at": "2026-04-25T02:04:41.139489+00:00",
+    "duration_seconds": 17.969085
+  }
+}

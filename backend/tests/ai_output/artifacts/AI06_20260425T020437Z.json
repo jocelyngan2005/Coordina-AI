@@ -1,0 +1,62 @@
+{
+  "case_id": "AI06",
+  "agent": "instruction_analysis",
+  "recorded_at": "2026-04-25T02:04:37.298704+00:00",
+  "input": {
+    "project_id": "ai-test-06",
+    "document_text": "This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. This is a sentence about the project requirements and goals. ",
+    "document_type": "brief"
+  },
+  "output": {
+    "agent": "instruction_analysis",
+    "status": "success",
+    "result": {
+      "document_type": "brief",
+      "deliverables": [
+        {
+          "id": "D1",
+          "title": "Unspecified Project Deliverable",
+          "description": "The document references project requirements and goals repeatedly but provides no specific deliverable details.",
+          "weight_pct": 0
+        }
+      ],
+      "grading_priorities": [
+        {
+          "criterion": "Unspecified",
+          "weight_pct": 0,
+          "notes": "No grading criteria or prioritization information found in the document."
+        }
+      ],
+      "implicit_expectations": [
+        "The document is expected to contain actual project requirements and goals but currently contains only placeholder text."
+      ],
+      "ambiguities": [
+        {
+          "issue": "The entire document consists of repeated placeholder sentences with no substantive content about project requirements, deliverables, deadlines, or goals.",
+          "suggested_clarification": "Replace placeholder text with actual project brief content including specific deliverables, deadlines, scope, and success criteria."
+        },
+        {
+          "issue": "No deadlines or timelines are mentioned.",
+          "suggested_clarification": "Provide project milestones and final deadline."
+        },
+        {
+          "issue": "No scope boundaries or constraints are defined.",
+          "suggested_clarification": "Define what is in-scope and out-of-scope for this project."
+        }
+      ],
+      "structured_goals": [
+        {
+          "goal_id": "G1",
+          "statement": "Obtain actual project requirements and goals to replace placeholder content in the brief.",
+          "priority": "high"
+        }
+      ],
+      "confidence_score": 0.05,
+      "source_notes": "Document contains only repeated placeholder text: 'This is a sentence about the project requirements and goals.' No actionable information, speakers, or substantive sections could be identified.",
+      "escalation_required": true,
+      "escalation_reason": "Low confidence in requirement extraction. Manual review or clarification recommended."
+    },
+    "executed_at": "2026-04-25T02:04:33.078087+00:00",
+    "duration_seconds": 4.220617
+  }
+}

@@ -1,0 +1,165 @@
+{
+  "case_id": "AI04",
+  "agent": "risk_detection",
+  "recorded_at": "2026-04-25T02:04:21.102501+00:00",
+  "input": {
+    "project_id": "ai-test-04",
+    "tasks": [
+      {
+        "task_id": "T1",
+        "title": "DB schema",
+        "status": "done",
+        "priority": "critical",
+        "estimated_hours": 3,
+        "completion_pct": 100
+      },
+      {
+        "task_id": "T2",
+        "title": "API endpoints",
+        "status": "in_progress",
+        "priority": "high",
+        "estimated_hours": 6,
+        "completion_pct": 50
+      },
+      {
+        "task_id": "T3",
+        "title": "GLM hookup",
+        "status": "pending",
+        "priority": "critical",
+        "estimated_hours": 8,
+        "completion_pct": 0
+      },
+      {
+        "task_id": "T4",
+        "title": "React UI",
+        "status": "pending",
+        "priority": "high",
+        "estimated_hours": 6,
+        "completion_pct": 0
+      },
+      {
+        "task_id": "T5",
+        "title": "Write report",
+        "status": "pending",
+        "priority": "medium",
+        "estimated_hours": 5,
+        "completion_pct": 0
+      }
+    ],
+    "members": [
+      {
+        "id": "m1",
+        "name": "Alice",
+        "skills": [
+          "python",
+          "fastapi"
+        ],
+        "contribution_score": 0.8,
+        "last_activity_at": "2025-11-17"
+      },
+      {
+        "id": "m2",
+        "name": "Bob",
+        "skills": [
+          "react",
+          "typescript"
+        ],
+        "contribution_score": 0.5,
+        "last_activity_at": "2025-11-17"
+      },
+      {
+        "id": "m3",
+        "name": "Carol",
+        "skills": [
+          "writing",
+          "documentation"
+        ],
+        "contribution_score": 0.3,
+        "last_activity_at": "2025-11-16"
+      },
+      {
+        "id": "m4",
+        "name": "Dave",
+        "skills": [
+          "design",
+          "figma"
+        ],
+        "contribution_score": 0.4,
+        "last_activity_at": "2025-11-17"
+      }
+    ],
+    "deadline_date": "2025-11-25",
+    "current_date": "2025-11-17",
+    "decision_history": []
+  },
+  "output": {
+    "agent": "risk_detection",
+    "status": "success",
+    "result": {
+      "project_health": "at_risk",
+      "health_score": 0.42,
+      "deadline_failure_probability": 0.68,
+      "identified_risks": [
+        {
+          "id": "R1",
+          "type": "dependency_blocker",
+          "severity": "high",
+          "description": "T3 (GLM hookup) is critical priority but cannot start until T2 (API endpoints) is completed; T2 is only 50% done.",
+          "impact": "Critical path is blocked; T3's 8 estimated hours cannot begin, cascading delays to downstream integration and testing.",
+          "recommended_action_type": "dependency_blocker",
+          "recommended_action": "Prioritize Alice to focus exclusively on completing T2 API endpoints, then immediately transition to T3 GLM hookup to unblock the critical path."
+        },
+        {
+          "id": "R2",
+          "type": "deadline_risk",
+          "severity": "high",
+          "description": "22 of 28 estimated hours remain with only 8 days left; current daily completion rate of ~0.86 hrs/day is far below the required 2.75 hrs/day.",
+          "impact": "At current pace, only ~46% of total project work will be completed by the Nov 25 deadline, leaving critical and high-priority deliverables unfinished.",
+          "recommended_action_type": "deadline_risk",
+          "recommended_action": "Reallocate all members to parallelize work: Bob starts T4 React UI immediately using mocked API responses, Carol begins T5 report draft with available schema docs, while Alice finishes T2/T3."
+        },
+        {
+          "id": "R3",
+          "type": "ambiguity",
+          "severity": "medium",
+          "description": "T3 'GLM hookup' lacks specification on which GLM model, integration method, expected I/O format, and acceptance criteria.",
+          "impact": "Without clear requirements, implementation may diverge from expectations, requiring costly rework and further delaying the critical path.",
+          "recommended_action_type": "ambiguity",
+          "recommended_action": "Schedule an immediate requirements clarification session to define GLM model version, API contract, response schema, and acceptance criteria before T3 development begins."
+        },
+        {
+          "id": "R4",
+          "type": "missing_artifact",
+          "severity": "medium",
+          "description": "T4 (React UI) and T5 (Write report) are at 0% completion with no visible artifacts, wireframes, or outlines started.",
+          "impact": "Late starts on these tasks compress available time for iteration and review, increasing likelihood of low-quality deliverables or incomplete submissions.",
+          "recommended_action_type": "scope_issue",
+          "recommended_action": "Have Bob create initial React UI component scaffolding with mock data, and Carol produce a report outline and draft introduction based on completed DB schema work."
+        },
+        {
+          "id": "R5",
+          "type": "inactivity",
+          "severity": "low",
+          "description": "Carol has the lowest contribution score (0.3) and was last active 1 day ago while her assigned task T5 remains at 0%.",
+          "impact": "Underutilization of Carol delays documentation deliverables and creates uneven workload distribution across the team.",
+          "recommended_action_type": "member_engagement",
+          "recommended_action": "Assign Carol a concrete first deliverable for T5 (report outline by end of day) and check in on any blockers preventing her contribution."
+        }
+      ],
+      "inactive_members": [
+        {
+          "member_id": "m3",
+          "last_activity_days_ago": 1,
+          "recommended_action": "Engage Carol immediately with a specific T5 deliverable (report outline) and verify no blockers exist; her documentation skills are needed now to parallelize work."
+        }
+      ],
+      "daily_completion_rate": 0.86,
+      "projected_completion_rate": 0.46,
+      "auto_recovery_triggered": true,
+      "recovery_urgency": "soon",
+      "inactivity_alert": true
+    },
+    "executed_at": "2026-04-25T02:04:01.038771+00:00",
+    "duration_seconds": 20.06373
+  }
+}

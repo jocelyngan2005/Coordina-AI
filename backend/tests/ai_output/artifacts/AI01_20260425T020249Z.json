@@ -1,0 +1,164 @@
+{
+  "case_id": "AI01",
+  "agent": "instruction_analysis",
+  "recorded_at": "2026-04-25T02:02:49.741053+00:00",
+  "input": {
+    "project_id": "ai-test-01",
+    "document_text": "\nProject Brief: AI-Powered Student Workflow Manager\n\nObjective:\nBuild a web-based system using Z.AI GLM as the reasoning engine to help\nstudent groups manage project workflows. The system must support document\ningestion, automated task planning, role assignment, and risk detection.\n\nDeliverables:\n1. Working web prototype (React frontend + FastAPI backend)\n2. System architecture document with component diagram\n3. 3000-word technical report covering design decisions\n4. 10-minute demonstration video\n5. QA testing document\n\nEvaluation Criteria:\n- System Architecture & Design: 30%\n- Code Quality & Modularity: 25%\n- AI Integration Depth: 20%\n- Documentation: 15%\n- Presentation: 10%\n\nDeadline: 1 December 2025\nTeam size: 4 members\n",
+    "document_type": "brief"
+  },
+  "output": {
+    "agent": "instruction_analysis",
+    "status": "success",
+    "result": {
+      "document_type": "brief",
+      "deliverables": [
+        {
+          "id": "D1",
+          "title": "Working Web Prototype",
+          "description": "React frontend + FastAPI backend implementing document ingestion, automated task planning, role assignment, and risk detection powered by Z.AI GLM",
+          "weight_pct": 30
+        },
+        {
+          "id": "D2",
+          "title": "System Architecture Document",
+          "description": "Architecture document with component diagram detailing system design and component interactions",
+          "weight_pct": 15
+        },
+        {
+          "id": "D3",
+          "title": "Technical Report",
+          "description": "3000-word report covering design decisions and rationale",
+          "weight_pct": 15
+        },
+        {
+          "id": "D4",
+          "title": "Demonstration Video",
+          "description": "10-minute video demonstrating the working system",
+          "weight_pct": 10
+        },
+        {
+          "id": "D5",
+          "title": "QA Testing Document",
+          "description": "Testing documentation covering quality assurance processes and results",
+          "weight_pct": 10
+        }
+      ],
+      "grading_priorities": [
+        {
+          "criterion": "System Architecture & Design",
+          "weight_pct": 30,
+          "notes": "Highest weight; architecture document and prototype design must be thorough and well-reasoned"
+        },
+        {
+          "criterion": "Code Quality & Modularity",
+          "weight_pct": 25,
+          "notes": "Second highest; codebase should be clean, well-structured, and modular"
+        },
+        {
+          "criterion": "AI Integration Depth",
+          "weight_pct": 20,
+          "notes": "Z.AI GLM integration must go beyond surface-level calls; demonstrate meaningful use of the reasoning engine"
+        },
+        {
+          "criterion": "Documentation",
+          "weight_pct": 15,
+          "notes": "Covers architecture doc, technical report, and QA document quality"
+        },
+        {
+          "criterion": "Presentation",
+          "weight_pct": 10,
+          "notes": "Demo video quality and clarity of communication"
+        }
+      ],
+      "implicit_expectations": [
+        "Z.AI GLM must be meaningfully integrated as the reasoning engine, not just a superficial API call",
+        "All four core features (document ingestion, task planning, role assignment, risk detection) must be functional in the prototype",
+        "The system is designed for student group use, implying multi-user or collaborative considerations",
+        "The architecture document should clearly show how Z.AI GLM fits into the system",
+        "The technical report should justify technology choices and design patterns",
+        "The QA document should cover both frontend and backend testing",
+        "Code modularity suggests the team should follow separation of concerns and clean architecture principles",
+        "Team of 4 implies need for clear division of work and coordinated integration"
+      ],
+      "ambiguities": [
+        {
+          "issue": "Document ingestion scope undefined",
+          "suggested_clarification": "Specify which document formats must be supported (PDF, DOCX, plain text, etc.) and expected ingestion volume"
+        },
+        {
+          "issue": "AI Integration Depth is subjective",
+          "suggested_clarification": "Define what constitutes 'deep' integration vs. surface-level use — e.g., multi-step reasoning, context retention, chaining prompts"
+        },
+        {
+          "issue": "Risk detection scope unclear",
+          "suggested_clarification": "Clarify what types of risks — project timeline risks, task dependency risks, team member workload risks, or all of the above"
+        },
+        {
+          "issue": "Role assignment mechanism unspecified",
+          "suggested_clarification": "Determine if role assignment should be AI-suggested, manual, or a hybrid approach with AI recommendations"
+        },
+        {
+          "issue": "QA testing document scope undefined",
+          "suggested_clarification": "Specify whether unit tests, integration tests, end-to-end tests, or user acceptance testing are expected and at what coverage level"
+        },
+        {
+          "issue": "Deployment requirements not stated",
+          "suggested_clarification": "Clarify if the prototype needs to be deployed to a hosting environment or if local execution is sufficient for evaluation"
+        }
+      ],
+      "structured_goals": [
+        {
+          "goal_id": "G1",
+          "statement": "Design and implement a robust system architecture for the AI-Powered Student Workflow Manager with clear component separation",
+          "priority": "high"
+        },
+        {
+          "goal_id": "G2",
+          "statement": "Build a functional React + FastAPI web prototype with all four core features: document ingestion, automated task planning, role assignment, and risk detection",
+          "priority": "high"
+        },
+        {
+          "goal_id": "G3",
+          "statement": "Achieve deep integration with Z.AI GLM reasoning engine across multiple system features",
+          "priority": "high"
+        },
+        {
+          "goal_id": "G4",
+          "statement": "Ensure code quality and modularity through clean architecture, separation of concerns, and consistent coding standards",
+          "priority": "high"
+        },
+        {
+          "goal_id": "G5",
+          "statement": "Produce a comprehensive system architecture document with component diagram",
+          "priority": "medium"
+        },
+        {
+          "goal_id": "G6",
+          "statement": "Write a 3000-word technical report thoroughly covering design decisions and rationale",
+          "priority": "medium"
+        },
+        {
+          "goal_id": "G7",
+          "statement": "Create a QA testing document covering test strategies and results for both frontend and backend",
+          "priority": "medium"
+        },
+        {
+          "goal_id": "G8",
+          "statement": "Record a 10-minute demonstration video clearly showcasing system capabilities",
+          "priority": "low"
+        },
+        {
+          "goal_id": "G9",
+          "statement": "Coordinate team of 4 members with clear division of responsibilities to meet 1 December 2025 deadline",
+          "priority": "medium"
+        }
+      ],
+      "confidence_score": 0.88,
+      "source_notes": "Project brief document; no speakers to identify. Key sections: Objective, Deliverables (5 items), Evaluation Criteria (5 categories with weights), Deadline and team size constraints.",
+      "escalation_required": false
+    },
+    "executed_at": "2026-04-25T02:02:37.071881+00:00",
+    "duration_seconds": 12.669172
+  }
+}
