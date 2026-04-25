@@ -8,9 +8,9 @@ Coordina AI is a stateful, multi-agent workflow system for student group project
 
 * Pitching Video: 
 * Pitch Deck: 
-* Product Requirement Document (PRD): 
-* System Analysis Document (SAD): 
-* Quality Assurance Testing Document (QATD): 
+* Product Requirement Document (PRD): [Click here](https://drive.google.com/file/d/1dygc7xrELOBPbaYsgtwdlFPWuYubrRIi/view?usp=sharing)
+* System Analysis Document (SAD): [Click here](https://drive.google.com/file/d/1KJYphgDKD6bp9uBak2-qy4zHDSvBJfuk/view?usp=sharing)
+* Quality Assurance Testing Document (QATD): [Click here](https://drive.google.com/file/d/1q1EoJD5Op9Gz72NwRRJhP2axypO0Ljoe/view?usp=sharing)
 
 ## Why it exists
 
