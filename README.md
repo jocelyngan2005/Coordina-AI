@@ -37,61 +37,303 @@ GLM is the reasoning core. If you remove it, the system loses its ability to int
 
 ## System Architecture
 
-### Input Layer
-Unstructured sources are parsed before they enter the reasoning pipeline.
+### High-Level Overview
 
-- Project brief documents
-- Rubrics and grading criteria
-- Meeting transcripts
-- Chat logs
-- File submissions
-- Progress updates
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              FRONTEND (React + Vite)                        │
+│                                                                             │
+│   ┌──────────────┐  ┌──────────────┐  ┌───────────────┐  ┌─────────────┐    │
+│   │   Project    │  │  Task Board  │  │  Risk Panel   │  │  Decision   │    │
+│   │  Dashboard   │  │  (Kanban)    │  │  & Health     │  │  Audit Log  │    │
+│   └──────┬───────┘  └──────┬───────┘  └───────┬───────┘  └────────┬────┘    │
+│          └─────────────────┴──────────┬───────┘                   │         │
+│                                       │  REST + WebSocket         │         │
+└───────────────────────────────────────┼───────────────────────────┼─────────┘
+                                        │                           │
+                    ┌───────────────────▼───────────────────────────▼──────────┐
+                    │                 API LAYER (FastAPI)                      │
+                    │                                                          │
+                    │  /api/projects   /api/tasks    /api/teams                │
+                    │  /api/documents  /api/workflow /api/analytics            │
+                    │  /api/agents     ws:/projects/{id}  GET /stream-pipeline │
+                    └───────────────────────────────┬──────────────────────────┘
+                                                    │
+                    ┌───────────────────────────────▼──────────────────────────┐
+                    │                 ORCHESTRATION ENGINE                     │
+                    │                                                          │
+                    │   WorkflowEngine ──► TaskRouter ──► StateManager         │
+                    │         │                                │               │
+                    │         └──────────► EventBus ◄─────────┘                │
+                    └──────────┬───────────────────────────────────────────────┘
+                               │  dispatches to
+         ┌─────────────────────┼─────────────────────────────────┐
+         │                     │  AGENT LAYER                    │
+         │                     │                                 │
+         │   ┌─────────────────▼──────────────────────────────┐  │
+         │   │              BaseAgent (abstract)              │  │
+         │   └─────┬──────┬──────┬──────┬──────┬──────────────┘  │
+         │         │      │      │      │      │                 │
+         │      ┌──▼──┐ ┌─▼──┐ ┌─▼──┐ ┌─▼──┐ ┌─▼───┐             │
+         │      │ A1  │ │ A2 │ │ A3 │ │ A4 │ │ A5  │             │
+         │      │Inst │ │Plan│ │Cord│ │Risk│ │Subm │             │
+         │      └──┬──┘ └─┬──┘ └┬───┘ └┬───┘ └┬────┘             │
+         │         └──────┴─────┴──────┴──────┘                  │
+         │                       │  every agent calls            │
+         └───────────────────────┼───────────────────────────────┘
+                                 │
+                    ┌────────────▼────────────────────────────────────────────┐
+                    │              GLM REASONING ENGINE                       │
+                    │                                                         │
+                    │   ReasoningEngine                                       │
+                    │     ├── load_prompt(template)  ← prompts/*.txt          │
+                    │     ├── inject context (project state + history)        │
+                    │     ├── call GLMClient ──► Z.AI API (GLM-4)             │
+                    │     ├── parse + validate JSON response                  │
+                    │     └── raise GLMReasoningError on failure              │
+                    └─────────────────────────────────────────────────────────┘
+                                 │                           │
+         ┌───────────────────────▼──────┐    ┌───────────────▼───────────────┐
+         │         REDIS (live state)   │    │     POSTGRESQL (persistent)   │
+         │                              │    │                               │
+         │  project:state:{id}          │    │  projects   members           │
+         │    workflow_stage            │    │  tasks      documents         │
+         │    structured_goals          │    │  decision_logs                │
+         │    tasks, milestones         │    │  workflow_events              │
+         │    role_assignments          │    │  ...                          │
+         │    last_risk_report          │    │  Alembic migrations           │
+         │    TTL: 30 days              │    │  SQLAlchemy ORM               │
+         │                              │    └───────────────────────────────┘
+         │  project:decisions:{id}      │
+         │    agent decision audit log  │
+         │    capped at 200 entries     │
+         │                              │
+         │  project:activity:{id}       │
+         │    member activity events    │
+         │    capped at 500 entries     │
+         │                              │
+         │  coordina:events:{id}        │
+         │    pub/sub channel           │
+         │    WebSocket bridge          │
+         └──────────────────────────────┘
+```
 
-### GLM Reasoning Core
-Z.AI GLM is the central intelligence layer responsible for:
+---
 
-- requirement interpretation
-- multi-step reasoning
-- task decomposition
-- responsibility inference
-- replanning when conditions change
-- maintaining context across the project lifecycle
+### Workflow Pipeline (5 Stages)
 
-### Agent Layer
-Coordina AI uses specialized agents instead of one generic assistant.
+```
+  User uploads brief/rubric
+           │
+           ▼
+  ┌─────────────────────┐
+  │  PARSERS            │  PDF → PyPDF2
+  │  document_parser    │  DOCX → python-docx
+  │  rubric_parser      │  TXT → decode UTF-8
+  │  transcript_parser  │  Chat → speaker turns
+  └────────┬────────────┘
+           │ extracted_text
+           ▼
+  ┌─────────────────────┐
+  │  STAGE 1 — ANALYSE  │  InstructionAnalysisAgent
+  │                     │  Input:  document_text, doc_type
+  │  GLM extracts:      │  Output: structured_goals [ ]
+  │  • Goals            │          grading_priorities [ ]
+  │  • Rubric weights   │          ambiguities [ ]
+  │  • Ambiguities      │          confidence_score
+  │  • Implicit expects │          escalation_required
+  └────────┬────────────┘
+           │ saves to project:state
+           ▼
+  ┌─────────────────────┐
+  │  STAGE 2 — PLAN     │  PlanningAgent
+  │                     │  Input:  structured_goals, team_size,
+  │  GLM generates:     │          deadline_date
+  │  • Task list        │  Output: tasks [ ] with dependencies
+  │  • Milestones       │          milestones [ ]
+  │  • Critical path    │          critical_path [ ]
+  │  • Capacity check   │          capacity_analysis
+  └────────┬────────────┘
+           │ saves tasks to project:state + DB
+           ▼
+  ┌─────────────────────┐
+  │  STAGE 3 — COORD    │  CoordinationAgent
+  │                     │  Input:  members, tasks,
+  │  GLM assigns:       │          activity_history
+  │  • Roles            │  Output: role_assignments [ ]
+  │  • Workload         │          meeting_agenda [ ]
+  │  • Meeting agenda   │          fairness_index (0–1)
+  │  • Fairness index   │          accountability_pairs [ ]
+  └────────┬────────────┘
+           │ saves to project:state
+           ▼
+  ┌─────────────────────┐
+  │  STAGE 4 — MONITOR  │  RiskDetectionAgent  (runs continuously)
+  │                     │  Input:  tasks, members,
+  │  GLM detects:       │          deadline_date, current_date
+  │  • Deadline risk    │  Output: project_health
+  │  • Inactivity       │          deadline_failure_probability
+  │  • Blockers         │          risks [ ]
+  │  • Auto-recovery    │          auto_recovery_triggered
+  └────────┬────────────┘
+           │  if auto_recovery_triggered → DeadlineRecovery
+           ▼
+  ┌─────────────────────┐
+  │  STAGE 5 — VALIDATE │  SubmissionReadinessAgent
+  │                     │  Input:  rubric_criteria,
+  │  GLM checks:        │          completed_deliverables,
+  │  • Rubric coverage  │          uploaded_artefacts
+  │  • Missing items    │  Output: readiness_score (0–100)
+  │  • Checklist        │          rubric_coverage [ ]
+  │  • Recommendation   │          recommendation
+  └─────────────────────┘
+```
 
-- Instruction Analysis Agent: extracts goals, ambiguities, and grading priorities
-- Planning Agent: builds tasks, milestones, dependencies, and timeline data
-- Coordination Agent: assigns roles and generates meeting agendas
-- Risk Detection Agent: flags inactivity and deadline failure probability
-- Submission Readiness Agent: checks rubric coverage and final readiness
+---
 
-### State and Orchestration
-The workflow engine coordinates the full lifecycle and stores persistent project state, including:
+### Agent Inputs & Outputs
 
-- team activity history
-- task completion state
-- decision reasoning logs
-- workflow evolution timeline
+| Agent | Input Sources | GLM Output | Stored In |
+|---|---|---|---|
+| **A1** InstructionAnalysis | `documents.extracted_text` | `structured_goals`, `grading_priorities`, `ambiguities`, `confidence_score` | `project:state` |
+| **A2** Planning | `state.structured_goals`, `members` count, `deadline_date` | `tasks[]`, `milestones[]`, `critical_path[]`, `capacity_analysis` | `project:state` + `tasks` table |
+| **A3** Coordination | `state.tasks`, `members[]`, `activity:history` | `role_assignments[]`, `meeting_agenda[]`, `fairness_index` | `project:state` |
+| **A4** RiskDetection | `state.tasks`, `members.last_activity_at`, `deadline_date` | `project_health`, `failure_probability`, `risks[]`, `recovery_actions[]` | `project:state` |
+| **A5** SubmissionReadiness | `state.rubric_criteria`, `state.tasks[status=done]`, `uploaded_artefacts` | `readiness_score`, `rubric_coverage[]`, `checklist[]`, `recommendation` | `project:state` |
 
-## Tech Stack
+> Every agent also writes to `project:decisions:{id}` (Redis) and `decision_logs` (PostgreSQL) for full audit trail.
 
-### Backend
+---
 
-- FastAPI
-- SQLAlchemy 2.x with async PostgreSQL
-- Redis for workflow/session state
-- Z.AI GLM as the reasoning engine
-- Pydantic for validation
-- pytest and pytest-asyncio for testing
+### Edge Case Handlers
 
-### Frontend
+```
+Ambiguous brief (confidence < 0.6)
+  └──► AmbiguityResolver ──► clarification_questions [ ]
+                          └──► working_assumptions [ ]
 
-- React 19
-- Vite
-- TypeScript
-- React Router
-- PDF and OCR support for document ingestion
+Missing fields (no deadline, no rubric)
+  └──► MissingDataHandler ──► safe_defaults + uncertainty_flags
+
+Inactive member (> 2 days)
+  └──► InactivityDetector ──► severity: warn | critical
+                          └──► redistribution_needed: bool
+
+Deadline failure probability > 50%
+  └──► DeadlineRecovery ──► tasks_to_cut [ ]
+                        └──► tasks_to_compress [ ]
+                        └──► priority_order [ ]
+```
+
+---
+
+### Database Schema (PostgreSQL)
+
+```
+projects (id, name, status, workflow_stage, start_date, deadline_date, team_size, confidence_score)
+  |
+  +-- members
+  |      (id, project_id, name, email, skills JSON, contribution_score, last_activity_at, joined_at)
+  |
+  +-- tasks
+  |      (id, project_id, task_id, title, description, phase, priority, status,
+  |       completion_pct, estimated_hours, start_date, due_date,
+  |       dependencies JSON, assignee_id -> members.id, assigned_to JSON, percentage_utilized)
+  |
+  +-- documents
+  |      (id, project_id, file_name, document_type, mime_type, content BYTEA, extracted_text, uploaded_at)
+  |
+  +-- structured_goals
+  |      (id, project_id, goal_id, title, description, priority, category, created_at)
+  |
+  +-- grading_criteria
+  |      (id, project_id, criterion_id, criterion_name, description,
+  |       max_score, weight, score, status, evidence, feedback)
+  |
+  +-- milestones
+  |      (id, project_id, name, description, due_date, is_completed, completed_at)
+  |
+  +-- role_assignments
+  |      (id, project_id, member_id -> members.id, role, description, assigned_at)
+  |
+  +-- contribution_balance
+  |      (id, project_id, member_id -> members.id, contribution_percentage, expected_percentage, balance_score)
+  |
+  +-- meeting_agendas
+  |      (id, project_id, title, description, scheduled_at, held_at, notes)
+  |
+  +-- accountability_pairs
+  |      (id, project_id, member_1_id -> members.id, member_2_id -> members.id,
+  |       objectives, check_in_frequency)
+  |
+  +-- activity_events
+  |      (id, project_id, activity_type, description, actor_id, target_id, created_at)
+  |
+  +-- detected_risks
+  |      (id, project_id, title, description, risk_level, probability, impact,
+  |       mitigation_plan, is_resolved, detected_at)
+  |
+  +-- risk_reports
+  |      (id, project_id, title, executive_summary, findings, recommendations, generated_at)
+  |
+  +-- submission_checklists
+  |      (id, project_id, item_description, is_completed, notes, completed_at)
+  |
+  +-- submission_reports
+  |      (id, project_id, title, content, status, submitted_at, feedback)
+  |
+  +-- decision_logs
+  |      (id, project_id, agent, decision_summary, output JSON, logged_at)
+  |
+  +-- workflow_events
+       (id, project_id, event_type, payload JSON, created_at)
+```
+
+---
+
+### Redis Key Design
+
+| Key Pattern | Type | Content | TTL |
+|---|---|---|---|
+| `project:state:{id}` | String (JSON) | Full workflow state — stage, goals, tasks, roles, risk report | 30 days |
+| `project:decisions:{id}` | List | GLM decision audit entries, max 200 | 30 days |
+| `project:activity:{id}` | List | Member activity events, max 500 | 30 days |
+| `coordina:events:{id}` | Pub/Sub channel | Workflow event stream → WebSocket | — |
+
+---
+
+### CI/CD Pipeline
+
+```
+git push
+    │
+    ▼
+GitHub Actions
+    ├── Services: PostgreSQL 16 + Redis 7
+    ├── pip install -r requirements.txt
+    ├── alembic upgrade head          ← migration gate
+    ├── pytest tests/unit/ -v         ← 100% required
+    ├── pytest tests/integration/ -v  ← 100% required
+    └── pytest --cov=. --cov-fail-under=80  ← 80% required
+
+Pull Request to main → all gates must pass before merge
+```
+
+---
+
+### Tech Stack
+
+| Layer | Technology |
+|---|---|
+| AI Reasoning | Z.AI GLM-4 (mandatory) |
+| Backend | FastAPI + Python 3.12 |
+| Frontend | React 18 + Vite |
+| Database | PostgreSQL 16 + SQLAlchemy 2.0 |
+| State Store | Redis 7 |
+| Document Parsing | PyPDF2, python-docx |
+| Testing | pytest, pytest-asyncio, Locust |
+| CI/CD | GitHub Actions |
+
 
 ## Repository Layout
 
