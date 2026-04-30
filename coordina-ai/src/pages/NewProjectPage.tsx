@@ -79,7 +79,7 @@ export default function NewProjectPage() {
     addFiles(e.dataTransfer.files);
   }
 
-  // ─── AI ingestion — real API with mock fallback ───────────────────────────
+  // ─── AI ingestion — real API with error handling ────────────────────────
 
   async function startIngestion() {
     setIngesting(true);
@@ -107,7 +107,7 @@ export default function NewProjectPage() {
         })
         .filter((m) => m.name);
 
-      await Promise.allSettled(
+      const memberResults = await Promise.allSettled(
         parsedMembers.map((m) =>
           teamsApi.addMember({
             project_id: project.id,
@@ -117,9 +117,18 @@ export default function NewProjectPage() {
         ),
       );
 
+      const membersFailed = memberResults.some((r) => r.status === 'rejected');
+      if (membersFailed) {
+        console.warn('Some team members failed to add, continuing...');
+      }
+
       // ── Step 2: Upload documents ──────────────────────────────────────────
       setIngestStep(2);
       const realFiles = files.filter((f) => f.file !== undefined);
+
+      if (realFiles.length === 0) {
+        throw new Error('No PDF files to upload. Please add documents before ingesting.');
+      }
 
       const uploadResults = await Promise.allSettled(
         realFiles.map((f) =>
@@ -133,14 +142,15 @@ export default function NewProjectPage() {
         .map((r) => (r as PromiseFulfilledResult<Awaited<ReturnType<typeof documentsApi.upload>>>).value.extracted_text ?? '')
         .filter(Boolean);
 
-      const documentText =
-        extractedTexts.length > 0
-          ? extractedTexts.join('\n\n---\n\n')
-          : `Project: ${projectName}\nDeadline: ${deadline}\nTeam: ${members}`;
+      if (extractedTexts.length === 0) {
+        throw new Error('Document extraction failed. Please try uploading again.');
+      }
 
-      // ── Step 3: Run the AI pipeline (non-streaming POST) ──────────────────
+      const documentText = extractedTexts.join('\n\n---\n\n');
+
+      // ── Step 3: Run the AI pipeline (wait for completion) ────────────────
       setIngestStep(3);
-      await workflowApi.runPipeline(project.id, {
+      const pipelineResult = await workflowApi.runPipeline(project.id, {
         document_text: documentText,
         document_type: 'brief',
         deadline_date: deadline || new Date().toISOString().slice(0, 10),
@@ -152,24 +162,29 @@ export default function NewProjectPage() {
         })),
       });
 
+      // Verify pipeline actually completed successfully
+      if (!pipelineResult || typeof pipelineResult !== 'object') {
+        throw new Error('Pipeline did not return valid results. Please try again.');
+      }
+
+      // ── Verify state was persisted ───────────────────────────────────────
+      // Wait a moment for database write, then fetch to confirm
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const stateCheck = await workflowApi.getState(project.id).catch(() => null);
+      
+      if (!stateCheck) {
+        console.warn('State not found immediately, but pipeline completed. Proceeding...');
+      }
+
       // ── Done ──────────────────────────────────────────────────────────────
       setIngestStep(4);
       setTimeout(() => navigate(`/projects/${project.id}`), 1200);
 
     } catch (err) {
-      // ── Fallback: simulate ingestion when backend is unavailable ──────────
-      console.warn('Backend unavailable, running demo simulation:', err);
-      setIngestError(null); // don't show error — run demo mode silently
-
-      let i = 0;
-      const interval = setInterval(() => {
-        i++;
-        setIngestStep(i);
-        if (i >= ingestSteps.length - 1) {
-          clearInterval(interval);
-          setTimeout(() => navigate('/projects/proj-001'), 1200);
-        }
-      }, 900);
+      const errorMsg = err instanceof Error ? err.message : 'An unknown error occurred';
+      setIngestError(errorMsg);
+      setIngesting(false);
+      console.error('Ingestion failed:', err);
     }
   }
 
@@ -406,8 +421,15 @@ export default function NewProjectPage() {
                   <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 20 }}>AI Processing your project...</h3>
 
                   {ingestError && (
-                    <div style={{ marginBottom: 16, padding: '10px 14px', background: '#fee2e2', borderRadius: 8, fontSize: 12, color: '#991b1b' }}>
-                      {ingestError}
+                    <div style={{ marginBottom: 16, padding: '12px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 12, color: '#991b1b' }}>
+                      <p style={{ fontWeight: 600, marginBottom: 4 }}>⚠️ Error during setup</p>
+                      <p style={{ fontSize: 11, lineHeight: 1.4 }}>{ingestError}</p>
+                      <button
+                        onClick={() => { setStep(1); setIngesting(false); setIngestError(null); }}
+                        style={{ marginTop: 8, fontSize: 11, padding: '4px 8px', background: 'transparent', color: '#991b1b', border: '1px solid #fca5a5', borderRadius: 4, cursor: 'pointer', fontWeight: 500 }}
+                      >
+                        ← Go Back
+                      </button>
                     </div>
                   )}
 
@@ -416,7 +438,7 @@ export default function NewProjectPage() {
                       const done = i < ingestStep;
                       const active = i === ingestStep && ingesting;
                       return (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, opacity: done || active ? 1 : 0.5 }}>
                           <div style={{
                             width: 20, height: 20, borderRadius: '50%',
                             background: done ? 'var(--grey-900)' : active ? 'var(--grey-300)' : 'var(--grey-150)',
@@ -431,7 +453,7 @@ export default function NewProjectPage() {
                       );
                     })}
                   </div>
-                  {ingestStep >= ingestSteps.length - 1 && (
+                  {ingestStep >= ingestSteps.length - 1 && !ingestError && (
                     <div style={{ marginTop: 20, padding: '12px 16px', background: 'var(--grey-50)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
                       <p style={{ fontSize: 13, color: 'var(--grey-700)' }}>✓ Project ready. Redirecting to workspace...</p>
                     </div>

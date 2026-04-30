@@ -9,6 +9,91 @@ import { teamsApi } from '../api/teams';
 import { workflowApi, analyticsApi } from '../api/workflow';
 import { mapProject, mapTasks, mapTeamMembers, extractRubric, extractRisks, mapRubric, mapRisks } from '../api/mappers';
 
+/* ─── Analysis Results Panel ─── */
+function AnalysisPanel({ state, dataSource }: { state: Record<string, unknown> | null; dataSource: 'glm' | 'mock' }) {
+  if (!state) return null;
+
+  const goals = Array.isArray(state.structured_goals) ? (state.structured_goals as Record<string, unknown>[]) : [];
+  const ambiguities = Array.isArray(state.ambiguities) ? (state.ambiguities as Record<string, unknown>[]) : [];
+  const confidence = Number(state.confidence_score ?? 0);
+  const priorities = Array.isArray(state.grading_priorities) ? (state.grading_priorities as Record<string, unknown>[]) : [];
+
+  if (goals.length === 0 && ambiguities.length === 0 && priorities.length === 0) {
+    return null;
+  }
+
+  const card: React.CSSProperties = {
+    background: '#fafaf8',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-lg)',
+    padding: '16px 18px',
+    marginBottom: 14,
+  };
+
+  return (
+    <div style={card}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div style={{ fontSize: 18, fontWeight: 400, color: 'var(--grey-900)' }}>
+          📋 Analysis Results
+        </div>
+        <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-3)', background: 'var(--white)', padding: '3px 8px', borderRadius: 4 }}>
+          {dataSource === 'glm' ? '✨ AI-Generated' : '📊 From Data'}
+        </span>
+      </div>
+
+      {confidence > 0 && (
+        <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-3)' }}>Confidence</span>
+          <div style={{ flex: 1, height: 6, background: 'var(--white)', borderRadius: 3, overflow: 'hidden', border: '1px solid var(--border)' }}>
+            <div style={{ height: '100%', background: confidence > 0.8 ? '#22c55e' : confidence > 0.6 ? '#f59e0b' : '#ef4444', width: `${confidence * 100}%` }} />
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--grey-900)' }}>{Math.round(confidence * 100)}%</span>
+        </div>
+      )}
+
+      {goals.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 6, textTransform: 'uppercase' }}>Structured Goals</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {goals.slice(0, 3).map((goal, i) => (
+              <div key={i} style={{ padding: '6px 10px', background: 'var(--white)', borderRadius: 6, border: '1px solid var(--border)', fontSize: 11 }}>
+                <span style={{ fontWeight: 500, color: 'var(--grey-900)' }}>{String(goal.title ?? goal.goal ?? `Goal ${i + 1}`)}</span>
+              </div>
+            ))}
+            {goals.length > 3 && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>+{goals.length - 3} more</span>}
+          </div>
+        </div>
+      )}
+
+      {priorities.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 6, textTransform: 'uppercase' }}>Grading Priorities</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {priorities.slice(0, 2).map((p, i) => (
+              <div key={i} style={{ fontSize: 10, color: 'var(--grey-700)' }}>
+                • {String(p.name ?? p.priority ?? `Priority ${i + 1}`)}
+              </div>
+            ))}
+            {priorities.length > 2 && <span style={{ fontSize: 9, color: 'var(--text-3)' }}>+{priorities.length - 2} more</span>}
+          </div>
+        </div>
+      )}
+
+      {ambiguities.length > 0 && (
+        <div style={{ padding: '8px 12px', background: '#fdf3e3', border: '1px solid #fde68a', borderRadius: 6 }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: '#92400e', marginBottom: 4 }}>⚠️ Ambiguities Detected</p>
+          {ambiguities.slice(0, 2).map((amb, i) => (
+            <p key={i} style={{ fontSize: 10, color: '#b45309', marginBottom: i < ambiguities.length - 1 ? 4 : 0 }}>
+              • {String(amb.description ?? amb.issue ?? amb.ambiguity ?? `Issue ${i + 1}`)}
+            </p>
+          ))}
+          {ambiguities.length > 2 && <p style={{ fontSize: 9, color: '#b45309' }}>+{ambiguities.length - 2} more</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Helpers ─── */
 function Avatar({ initials, size = 24, color }: { initials: string; size?: number; color?: string }) {
   return (
@@ -659,6 +744,8 @@ export default function ProjectWorkspacePage() {
   const [submissionChecklist, setSubmissionChecklist] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(!isMockId);
   const [apiAvailable, setApiAvailable] = useState(true);
+  const [workflowState, setWorkflowState] = useState<Record<string, unknown> | null>(null);
+  const [dataSource, setDataSource] = useState<'glm' | 'mock'>('mock');
 
   useEffect(() => {
     if (isMockId) {
@@ -691,6 +778,10 @@ export default function ProjectWorkspacePage() {
             : 0;
 
         if (workflowState) {
+          // Store workflow state as-is (already typed as WorkflowState)
+          setWorkflowState(workflowState);
+          setDataSource('glm');
+          
           // Use GLM planning tasks if available, fall back to DB tasks
           const glmTasks = Array.isArray(workflowState.tasks) && workflowState.tasks.length > 0
             ? mapTasks(workflowState.tasks as Record<string, unknown>[])
@@ -742,6 +833,7 @@ export default function ProjectWorkspacePage() {
             if (fallback) setRisks(fallback);
           }
         } else {
+          setDataSource('mock');
           const mapped = mapProject(backendProject, backendTasks, backendMembers, completionPct, riskScore);
           setProject(mapped);
         }
@@ -797,6 +889,7 @@ export default function ProjectWorkspacePage() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <AnalysisPanel state={workflowState} dataSource={dataSource} />
         <RubricTracker rubric={rubric} />
         <GanttTimeline tasks={p.tasks} />
         <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr 2fr', gap: 14, alignItems: 'start' }}>
