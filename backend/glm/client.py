@@ -3,11 +3,17 @@ glm/client.py — Z.AI GLM API client with retry logic and streaming support.
 """
 
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 
 from core.config import settings
 from core.exceptions import GLMReasoningError
 from core.logger import logger
+
+
+def _is_retryable_http_error(exc: Exception) -> bool:
+    if not isinstance(exc, httpx.HTTPStatusError):
+        return False
+    return exc.response.status_code in {408, 500, 502, 503, 504}
 
 
 class GLMClient:
@@ -19,15 +25,103 @@ class GLMClient:
     def __init__(self):
         self.base_url = settings.ZAI_API_BASE_URL
         self.model = settings.ZAI_MODEL
+        self.api_key = settings.ZAI_API_KEY
         self.headers = {
-            "Authorization": f"Bearer {settings.ZAI_API_KEY}",
             "Content-Type": "application/json",
         }
+
+    def _is_openai_compatible(self) -> bool:
+        return "/openai" in self.base_url.lower()
+
+    def _build_request_url(self) -> str:
+        if self._is_openai_compatible():
+            return f"{self.base_url.rstrip('/')}/chat/completions"
+
+        if self.base_url.endswith(":generateContent"):
+            return self.base_url
+
+        return f"{self.base_url.rstrip('/')}/models/{self.model}:generateContent"
+
+    def _build_payload(
+        self,
+        messages: list[dict],
+        system_prompt: str | None,
+        temperature: float,
+        max_tokens: int | None = None,
+        stream: bool = False,
+    ) -> dict:
+        if self._is_openai_compatible():
+            payload_messages = []
+            if system_prompt:
+                payload_messages.append({"role": "system", "content": system_prompt})
+            payload_messages.extend(messages)
+
+            payload = {
+                "model": self.model,
+                "messages": payload_messages,
+                "temperature": temperature,
+            }
+            if max_tokens is not None:
+                payload["max_tokens"] = max_tokens
+            if stream:
+                payload["stream"] = True
+            return payload
+
+        contents = []
+        if system_prompt:
+            contents.append({"role": "user", "parts": [{"text": system_prompt}]})
+
+        for message in messages:
+            contents.append(
+                {
+                    "role": message.get("role", "user"),
+                    "parts": [{"text": message.get("content", "")}],
+                }
+            )
+
+        payload = {
+            "contents": contents,
+            "generationConfig": {
+                "temperature": temperature,
+            },
+        }
+        if max_tokens is not None:
+            payload["generationConfig"]["maxOutputTokens"] = max_tokens
+        return payload
+
+    @staticmethod
+    def _extract_content(data: dict) -> str:
+        try:
+            candidates = data.get("candidates", [])
+            parts = candidates[0]["content"]["parts"]
+            text_chunks = [part.get("text", "") for part in parts if isinstance(part, dict)]
+            content = "".join(text_chunks)
+            if content:
+                return content
+        except (KeyError, IndexError, TypeError):
+            pass
+
+        try:
+            return data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as e:
+            raise GLMReasoningError(f"Invalid response structure from GLM: {e}") from e
+
+    @staticmethod
+    def _format_http_error(exc: httpx.HTTPStatusError) -> str:
+        status_code = exc.response.status_code
+        body = exc.response.text.strip()
+        if status_code == 429:
+            return (
+                f"Gemini quota exceeded (429 Too Many Requests). "
+                f"Please check billing/quota for model '{settings.ZAI_MODEL}'. "
+                f"Provider response: {body}"
+            )
+        return f"GLM API HTTP error {status_code}: {body}"
 
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type(httpx.HTTPStatusError),
+        retry=retry_if_exception(_is_retryable_http_error),
         reraise=True,
     )
     async def chat(
@@ -44,38 +138,29 @@ class GLMClient:
         Note: max_tokens set to 10000 for complex agents with large responses
         (planning decomposes to 13+ tasks with detailed descriptions).
         """
-        payload_messages = []
-        if system_prompt:
-            payload_messages.append({"role": "system", "content": system_prompt})
-        payload_messages.extend(messages)
+        payload = self._build_payload(
+            messages=messages,
+            system_prompt=system_prompt,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
 
-        payload = {
-            "model": self.model,
-            "messages": payload_messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
-
-        logger.debug(f"GLM request: model={self.model}, messages={len(payload_messages)}")
+        logger.debug(f"GLM request: model={self.model}, messages={len(messages) + (1 if system_prompt else 0)}")
         logger.debug(f"GLM payload: {payload}")
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             try:
                 response = await client.post(
-                    f"{self.base_url}/chat/completions",
+                    self._build_request_url(),
                     headers=self.headers,
                     json=payload,
+                    params={"key": self.api_key},
                 )
                 response.raise_for_status()
                 data = response.json()
                 logger.debug(f"GLM raw response: {data}")
-                
-                # Extract content safely
-                try:
-                    content = data["choices"][0]["message"]["content"]
-                except (KeyError, IndexError, TypeError) as e:
-                    logger.error(f"GLM response structure invalid: {e}. Full response: {data}")
-                    raise GLMReasoningError(f"Invalid response structure from GLM: {e}") from e
+
+                content = self._extract_content(data)
                 
                 # Handle None content
                 if content is None:
@@ -87,7 +172,7 @@ class GLMClient:
 
             except httpx.HTTPStatusError as e:
                 logger.error(f"GLM API HTTP error: {e.response.status_code} — {e.response.text}")
-                raise
+                raise GLMReasoningError(self._format_http_error(e)) from e
             except GLMReasoningError:
                 raise
             except Exception as e:
@@ -103,33 +188,42 @@ class GLMClient:
         """
         Streaming chat — yields text chunks for real-time WebSocket delivery.
         """
-        payload_messages = []
-        if system_prompt:
-            payload_messages.append({"role": "system", "content": system_prompt})
-        payload_messages.extend(messages)
-
-        payload = {
-            "model": self.model,
-            "messages": payload_messages,
-            "temperature": temperature,
-            "stream": True,
-        }
+        payload = self._build_payload(
+            messages=messages,
+            system_prompt=system_prompt,
+            temperature=temperature,
+            stream=True,
+        )
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             async with client.stream(
                 "POST",
-                f"{self.base_url}/chat/completions",
+                self._build_request_url(),
                 headers=self.headers,
                 json=payload,
+                params={"key": self.api_key},
             ) as response:
                 response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if line.startswith("data: ") and line != "data: [DONE]":
+                if self._is_openai_compatible():
+                    async for line in response.aiter_lines():
+                        if line.startswith("data: ") and line != "data: [DONE]":
+                            import json
+                            chunk = json.loads(line[6:])
+                            delta = chunk["choices"][0].get("delta", {})
+                            if "content" in delta:
+                                yield delta["content"]
+                else:
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data: "):
+                            continue
+                        if line == "data: [DONE]":
+                            break
                         import json
                         chunk = json.loads(line[6:])
-                        delta = chunk["choices"][0].get("delta", {})
-                        if "content" in delta:
-                            yield delta["content"]
+                        text = self._extract_content(chunk)
+                        if text:
+                            yield text
+        
 
 
 # Singleton
