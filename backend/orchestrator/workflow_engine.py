@@ -158,13 +158,38 @@ class WorkflowEngine:
         deadline = datetime.fromisoformat(deadline_date).date() if deadline_date else today
         days_available = max(1, (deadline - today).days)
 
+        compact_goals = [
+            {
+                "goal_id": goal.get("goal_id"),
+                "statement": goal.get("statement"),
+                "priority": goal.get("priority"),
+            }
+            for goal in state.get("structured_goals", [])
+        ]
+
+        compact_existing_tasks = [
+            {
+                "task_id": task.get("task_id") or task.get("id"),
+                "title": task.get("title"),
+                "status": task.get("status"),
+                "priority": task.get("priority"),
+                "estimated_hours": task.get("estimated_hours"),
+                "phase": task.get("phase"),
+                "dependencies": task.get("dependencies", []),
+                "assigned_to": task.get("assigned_to", []),
+                "startDate": task.get("startDate"),
+                "endDate": task.get("endDate"),
+            }
+            for task in state.get("tasks", [])
+        ]
+
         context = {
             "project_id": project_id,
-            "structured_goals": state["structured_goals"],
+            "structured_goals": compact_goals,
             "team_size": team_size,
             "deadline_date": deadline_date,
             "project_start_date": state.get("project_start_date") or today.isoformat(),
-            "existing_tasks": state.get("tasks", []),
+            "existing_tasks": compact_existing_tasks,
             "days_available": days_available,
         }
 
@@ -456,8 +481,19 @@ class WorkflowEngine:
             ("risk",        lambda: self.run_risk_check(project_id)),
         ]
         for stage_name, stage_fn in stages:
-            result = await stage_fn()
-            yield {"stage": stage_name, "data": result}
+            try:
+                logger.info(f"[WorkflowEngine] Starting stage: {stage_name}")
+                result = await stage_fn()
+                logger.info(f"[WorkflowEngine] Completed stage: {stage_name}")
+                yield {"stage": stage_name, "status": "complete", "data": result}
+            except WorkflowExecutionError as e:
+                logger.error(f"[WorkflowEngine] Stage {stage_name} failed: {str(e)}")
+                yield {"stage": stage_name, "status": "error", "error": str(e)}
+                break  # Stop pipeline on agent failure
+            except Exception as e:
+                logger.error(f"[WorkflowEngine] Unexpected error in stage {stage_name}: {type(e).__name__}: {str(e)}", exc_info=True)
+                yield {"stage": stage_name, "status": "error", "error": f"{type(e).__name__}: {str(e)}"}
+                break
 
     # ------------------------------------------------------------------ #
     #  Helpers                                                             #

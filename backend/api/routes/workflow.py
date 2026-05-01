@@ -154,16 +154,33 @@ async def stream_pipeline(
             pass
 
     async def event_generator():
-        async for stage_result in workflow_engine.stream_pipeline(
-            project_id=project_id,
-            document_text=document_text,
-            document_type=document_type,
-            deadline_date=deadline_date,
-            project_name=project_name,
-            team_size=team_size,
-            team_members=parsed_team_members,
-        ):
-            yield f"data: {json.dumps(stage_result)}\n\n"
+        try:
+            async for stage_result in workflow_engine.stream_pipeline(
+                project_id=project_id,
+                document_text=document_text,
+                document_type=document_type,
+                deadline_date=deadline_date,
+                project_name=project_name,
+                team_size=team_size,
+                team_members=parsed_team_members,
+            ):
+                yield f"data: {json.dumps(stage_result)}\n\n"
+        except WorkflowExecutionError as e:
+            error_event = {
+                "stage": "error",
+                "status": "error",
+                "error": str(e),
+                "retryable": True,
+            }
+            yield f"data: {json.dumps(error_event)}\n\n"
+        except Exception as e:
+            error_event = {
+                "stage": "error",
+                "status": "error",
+                "error": f"Pipeline stream failed: {type(e).__name__}: {str(e)}",
+                "retryable": False,
+            }
+            yield f"data: {json.dumps(error_event)}\n\n"
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

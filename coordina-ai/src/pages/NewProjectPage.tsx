@@ -46,11 +46,13 @@ export default function NewProjectPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const ingestSteps = [
-    'Parsing uploaded documents...',
-    'Running Instruction Analysis Agent...',
-    'Planning Agent decomposing tasks...',
-    'Team Coordination Agent assigning roles...',
-    'Project state initialised ✓',
+    'Initializing project...',
+    'Adding team members...',
+    'Uploading documents...',
+    'Instruction Analysis Agent — extracting goals & requirements...',
+    'Planning Agent — decomposing into tasks & milestones...',
+    'Coordination Agent — assigning roles & fairness analysis...',
+    'Project state initialized ✓',
   ];
 
   // ─── File handling ────────────────────────────────────────────────────────
@@ -148,27 +150,84 @@ export default function NewProjectPage() {
 
       const documentText = extractedTexts.join('\n\n---\n\n');
 
-      // ── Step 3: Run the AI pipeline (wait for completion) ────────────────
+      // ── Step 3: Run the AI pipeline with real-time streaming ──────────────
       setIngestStep(3);
-      const pipelineResult = await workflowApi.runPipeline(project.id, {
+      
+      const BASE_URL = 'http://localhost:8000/api';
+      const params = new URLSearchParams({
         document_text: documentText,
         document_type: 'brief',
         deadline_date: deadline || new Date().toISOString().slice(0, 10),
         project_name: projectName || 'Untitled Project',
-        team_size: parsedMembers.length,
-        team_members: parsedMembers.map((m) => ({
+        team_size: String(parsedMembers.length),
+        team_members: JSON.stringify(parsedMembers.map((m) => ({
           name: m.name,
           skills: m.role ? [m.role] : [],
-        })),
+        }))),
       });
 
-      // Verify pipeline actually completed successfully
-      if (!pipelineResult || typeof pipelineResult !== 'object') {
-        throw new Error('Pipeline did not return valid results. Please try again.');
+      const streamUrl = `${BASE_URL}/workflow/${project.id}/stream-pipeline?${params.toString()}`;
+      const response = await fetch(streamUrl);
+      
+      if (!response.ok) {
+        throw new Error(`Pipeline stream failed: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body from pipeline stream');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      const stageToStep: Record<string, number> = {
+        analysis: 3,
+        planning: 4,
+        coordination: 5,
+        risk: 5,
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines[lines.length - 1]; // Keep incomplete line for next iteration
+
+        for (const line of lines.slice(0, -1)) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') {
+              // Pipeline complete
+              setIngestStep(6);
+              break;
+            }
+            try {
+              const event = JSON.parse(data);
+              console.log('[SSE Event]', event); // Debug: log all events
+              
+              // Handle error events
+              if (event.status === 'error' || event.stage === 'error') {
+                throw new Error(String(event.error ?? 'Pipeline stream failed'));
+              }
+              
+              // Update step based on completed stage
+              if (event.status === 'complete' && typeof event.stage === 'string' && stageToStep[event.stage] !== undefined) {
+                console.log(`[SSE Progress] Stage ${event.stage} completed, updating to step ${stageToStep[event.stage]}`);
+                setIngestStep(stageToStep[event.stage]);
+              }
+            } catch (e) {
+              if (e instanceof Error) {
+                console.error('[SSE Parse Error]', e.message);
+                throw e;
+              }
+            }
+          }
+        }
       }
 
       // ── Verify state was persisted ───────────────────────────────────────
-      // Wait a moment for database write, then fetch to confirm
       await new Promise((resolve) => setTimeout(resolve, 500));
       const stateCheck = await workflowApi.getState(project.id).catch(() => null);
       
@@ -177,7 +236,6 @@ export default function NewProjectPage() {
       }
 
       // ── Done ──────────────────────────────────────────────────────────────
-      setIngestStep(4);
       setTimeout(() => navigate(`/projects/${project.id}`), 1200);
 
     } catch (err) {
