@@ -10,6 +10,14 @@ from core.exceptions import GLMReasoningError
 from core.logger import logger
 
 
+RETRIABLE_GLM_EXCEPTIONS = (
+    httpx.HTTPStatusError,
+    httpx.TimeoutException,
+    httpx.ReadTimeout,
+    httpx.ConnectTimeout,
+)
+
+
 class GLMClient:
     """
     Low-level async wrapper around Z.AI's GLM chat completions API.
@@ -27,7 +35,7 @@ class GLMClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type(httpx.HTTPStatusError),
+        retry=retry_if_exception_type(RETRIABLE_GLM_EXCEPTIONS),
         reraise=True,
     )
     async def chat(
@@ -87,6 +95,9 @@ class GLMClient:
 
             except httpx.HTTPStatusError as e:
                 logger.error(f"GLM API HTTP error: {e.response.status_code} — {e.response.text}")
+                raise
+            except httpx.TimeoutException as e:
+                logger.error(f"GLM API timeout: {type(e).__name__}: {str(e)}")
                 raise
             except GLMReasoningError:
                 raise
