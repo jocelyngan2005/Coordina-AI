@@ -23,9 +23,9 @@ class GLMClient:
     """
 
     def __init__(self):
-        self.base_url = settings.ZAI_API_BASE_URL
-        self.model = settings.ZAI_MODEL
-        self.api_key = settings.ZAI_API_KEY
+        self.base_url = settings.GEMINI_API_BASE_URL
+        self.model = settings.GEMINI_MODEL
+        self.api_key = settings.GEMINI_API_KEY
         self.headers = {
             "Content-Type": "application/json",
         }
@@ -113,7 +113,7 @@ class GLMClient:
         if status_code == 429:
             return (
                 f"Gemini quota exceeded (429 Too Many Requests). "
-                f"Please check billing/quota for model '{settings.ZAI_MODEL}'. "
+                f"Please check billing/quota for model '{settings.GEMINI_MODEL}'. "
                 f"Provider response: {body}"
             )
         return f"GLM API HTTP error {status_code}: {body}"

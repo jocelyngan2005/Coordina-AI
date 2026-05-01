@@ -16,9 +16,9 @@ class Settings(BaseSettings):
     )
 
     # LLM API (Google Gemini)
-    ZAI_API_KEY: str
-    ZAI_API_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai"
-    ZAI_MODEL: str = "gemini-2.5-pro"
+    GEMINI_API_KEY: str
+    GEMINI_API_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+    GEMINI_MODEL: str = "gemini-2.5-pro"
 
     # Database
     DATABASE_URL: str
