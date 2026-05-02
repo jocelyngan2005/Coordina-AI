@@ -311,7 +311,7 @@ function TaskList({ tasks, members }: { tasks: BackendTask[]; members: BackendMe
           >All members</button>
 
           {/* Per-member chips */}
-          {membersWithTasks.map((m, i) => {
+          {membersWithTasks.map((m) => {
             const color = PIE_COLORS[members.indexOf(m) % PIE_COLORS.length];
             const active = memberFilter === m.id;
             const count = tasks.filter(t => t.assignee_id === m.id).length;

@@ -4,7 +4,7 @@
  * the UI never crashes when the backend omits optional data.
  */
 
-import type { Task, TeamMember, Project, RiskAlert, RubricItem, ChecklistItem } from '../types';
+import type { Task, TeamMember, Project, RiskAlert, RubricItem } from '../types';
 import type { BackendTask, BackendMember, BackendProject } from './types';
 import { deriveInitials } from '../utils/text';
 

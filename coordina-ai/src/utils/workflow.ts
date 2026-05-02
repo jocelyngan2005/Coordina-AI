@@ -74,7 +74,6 @@ export function hasSubstantiveResults(state: Record<string, unknown>): boolean {
  * Get a human-readable summary of what AI work has been done.
  */
 export function getCompletionSummary(state: Record<string, unknown>): string {
-  const stage = String(state.workflow_stage ?? 'unknown');
   const hasGoals = Array.isArray(state.structured_goals) && state.structured_goals.length > 0;
   const hasTasks = Array.isArray(state.tasks) && state.tasks.length > 0;
   const hasAssignments = Array.isArray(state.role_assignments) && state.role_assignments.length > 0;

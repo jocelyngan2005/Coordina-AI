@@ -2,7 +2,6 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/ui/Button';
 import { projectsApi } from '../api/projects';
-import { teamsApi } from '../api/teams';
 import { documentsApi } from '../api/documents';
 import { workflowApi } from '../api/workflow';
 
