@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { ProjectsProvider } from './contexts/ProjectsContext';
 import Navbar from './components/layout/Navbar';
 import DashboardPage from './pages/DashboardPage';
 import NewProjectPage from './pages/NewProjectPage';
@@ -32,7 +33,9 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppRoutes />
+      <ProjectsProvider>
+        <AppRoutes />
+      </ProjectsProvider>
     </BrowserRouter>
   );
 }

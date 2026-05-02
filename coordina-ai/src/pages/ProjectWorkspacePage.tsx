@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import PageLayout from '../components/layout/PageLayout';
-import { MOCK_PROJECT, MOCK_RISKS, MOCK_RUBRIC } from '../data/mockData';
+import { useProjects } from '../contexts/ProjectsContext';
 import type { Task, RiskAlert, RubricItem, Project, ChecklistItem } from '../types';
 import { projectsApi } from '../api/projects';
 import { tasksApi } from '../api/tasks';
@@ -682,17 +682,8 @@ function AccountabilityAndTasks({ project }: { project: Project }) {
 }
 
 /* ─── Section D: Submission Checklist ─── */
-const MOCK_CHECKLIST: ChecklistItem[] = [
-  { item: 'Project Brief uploaded', status: 'complete', priority: 'high' },
-  { item: 'Grading Rubric uploaded', status: 'complete', priority: 'high' },
-  { item: 'Meeting Transcripts submitted', status: 'complete', priority: 'medium' },
-  { item: 'Technical Documentation complete', status: 'in_progress', priority: 'high' },
-  { item: 'Test Report submitted', status: 'pending', priority: 'high' },
-  { item: 'Final Presentation Slides ready', status: 'pending', priority: 'medium' },
-];
-
 function ArtifactsCard({ checklist }: { checklist: ChecklistItem[] }) {
-  const items = checklist.length > 0 ? checklist : MOCK_CHECKLIST;
+  const items = checklist;
   const completeCount = items.filter((c) => c.status === 'complete').length;
   return (
     <div style={{ ...card, padding: 0, display: 'flex', flexDirection: 'column' }}>
@@ -1162,10 +1153,12 @@ export default function ProjectWorkspacePage() {
   const { id: urlId } = useParams<{ id: string }>();
   const projectId = urlId ?? 'proj-001';
   const isMockId = projectId === 'proj-001';
+  const navigate = useNavigate();
+  const { refreshProjects } = useProjects();
 
   const [project, setProject] = useState<Project | null>(null);
-  const [rubric, setRubric] = useState<RubricItem[]>(MOCK_RUBRIC);
-  const [risks, setRisks] = useState<RiskAlert[]>(MOCK_RISKS);
+  const [rubric, setRubric] = useState<RubricItem[]>([]);
+  const [risks, setRisks] = useState<RiskAlert[]>([]);
   const [submissionChecklist, setSubmissionChecklist] = useState<ChecklistItem[]>([]);
   const [submissionReport, setSubmissionReport] = useState<Record<string, unknown> | null>(null);
   const [milestones, setMilestones] = useState<Record<string, unknown>[]>([]);
@@ -1173,6 +1166,8 @@ export default function ProjectWorkspacePage() {
   const [apiAvailable, setApiAvailable] = useState(true);
   const [workflowState, setWorkflowState] = useState<Record<string, unknown> | null>(null);
   const [dataSource, setDataSource] = useState<'glm' | 'mock'>('mock');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Handle task status changes and update backend + local state
   const handleTaskStatusChange = async (taskId: string, newStatus: Task['status']) => {
@@ -1196,11 +1191,33 @@ export default function ProjectWorkspacePage() {
     });
   };
 
+  const handleMarkComplete = async () => {
+    if (!project || isMockId) return;
+    try {
+      await projectsApi.update(projectId, { status: 'completed' });
+      navigate('/');
+    } catch (err) {
+      console.error('Failed to mark project as complete:', err);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!project || isMockId) return;
+    setIsDeleting(true);
+    try {
+      await projectsApi.delete(projectId);
+      setShowDeleteModal(false);
+      await refreshProjects();
+      navigate('/');
+    } catch (err) {
+      console.error('Failed to delete project:', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   useEffect(() => {
     if (isMockId) {
-      setProject(MOCK_PROJECT);
-      setRubric(MOCK_RUBRIC);
-      setRisks(MOCK_RISKS);
       setLoading(false);
       return;
     }
@@ -1329,7 +1346,6 @@ export default function ProjectWorkspacePage() {
         setApiAvailable(true);
       } catch {
         if (!cancelled) {
-          setProject(MOCK_PROJECT);
           setApiAvailable(false);
         }
       } finally {
@@ -1342,15 +1358,18 @@ export default function ProjectWorkspacePage() {
   }, [projectId, isMockId]);
 
   if (loading) return <WorkspaceSkeleton />;
+  if (!project) return <PageLayout><p style={{ fontSize: 14, color: 'var(--text-3)' }}>Project not found or failed to load.</p></PageLayout>;
 
-  const p = project ?? MOCK_PROJECT;
+  const p = project;
   const missing = rubric.filter((r) => r.status === 'missing').length;
   const partial = rubric.filter((r) => r.status === 'partial').length;
   const goNogo = missing === 0 && partial <= 1 ? 'GO' : 'NO-GO';
+  const allTasksCompleted = p.tasks.length > 0 && p.tasks.every((t) => t.status === 'done');
 
   return (
-    <PageLayout>
-      {/* ── Page Header ── */}
+    <>
+      <PageLayout>
+        {/* ── Page Header ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -1372,6 +1391,43 @@ export default function ProjectWorkspacePage() {
               <span style={{ fontSize: 12, fontWeight: 600, color: '#15803d' }}>Ready for submission</span>
             </div>
           )}
+          {!isMockId && (
+            <>
+              {allTasksCompleted && (
+                <button
+                  onClick={handleMarkComplete}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px',
+                    borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                    background: '#f5f5f5', color: 'var(--grey-900)', border: '1px solid var(--border)',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = '#ebebeb')}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = '#f5f5f5')}
+                >
+                  ✓ Mark Complete
+                </button>
+              )}
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                style={{
+                  position: 'relative', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = 'var(--grey-100)')}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = 'transparent')}
+                title="Delete project"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  <line x1="10" y1="11" x2="10" y2="17" />
+                  <line x1="14" y1="11" x2="14" y2="17" />
+                </svg>
+              </button>
+            </>
+          )}
           <NotificationBell notifications={risks} />
         </div>
       </div>
@@ -1389,5 +1445,83 @@ export default function ProjectWorkspacePage() {
         </div>
       </div>
     </PageLayout>
+
+    {/* Delete Confirmation Modal */}
+    {showDeleteModal && (
+      <>
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(17, 24, 39, 0.38)',
+          backdropFilter: 'blur(2px)',
+          zIndex: 999,
+        }} onClick={() => !isDeleting && setShowDeleteModal(false)} />
+        <div style={{
+          position: 'fixed', inset: 0,
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          padding: 24,
+          zIndex: 1000,
+        }}>
+          <div role="dialog" aria-modal="true" aria-label="Delete project" style={{
+            background: 'var(--white)',
+            borderRadius: 12,
+            boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+            border: '1px solid var(--border)',
+            maxWidth: 420,
+            width: '100%',
+            overflow: 'hidden',
+          }}>
+            <div style={{ padding: '24px 24px 20px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--grey-900)' }}>Delete Project</h2>
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={isDeleting}
+                  style={{
+                    background: 'transparent', border: 'none', cursor: isDeleting ? 'not-allowed' : 'pointer',
+                    color: 'var(--grey-400)', fontSize: 20, padding: 0, opacity: isDeleting ? 0.5 : 1,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+              <p style={{ fontSize: 13, color: 'var(--text-3)', lineHeight: 1.5 }}>
+                This action cannot be undone. The project "{p.name}" and all associated data will be permanently deleted from the system.
+              </p>
+            </div>
+            <div style={{ padding: '16px 24px', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+                style={{
+                  padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 500,
+                  background: 'var(--grey-100)', color: 'var(--grey-900)', border: 'none',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer', opacity: isDeleting ? 0.5 : 1,
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={(e) => !isDeleting && ((e.currentTarget as HTMLButtonElement).style.background = '#e5e7eb')}
+                onMouseLeave={(e) => !isDeleting && ((e.currentTarget as HTMLButtonElement).style.background = '#f3f4f6')}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteProject}
+                disabled={isDeleting}
+                style={{
+                  padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 500,
+                  background: '#dc2626', color: 'var(--white)', border: 'none',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer', opacity: isDeleting ? 0.6 : 1,
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={(e) => !isDeleting && ((e.currentTarget as HTMLButtonElement).style.background = '#b91c1c')}
+                onMouseLeave={(e) => !isDeleting && ((e.currentTarget as HTMLButtonElement).style.background = '#dc2626')}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Project'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </>
+    )}
+    </>
   );
 }

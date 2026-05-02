@@ -1,6 +1,6 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { projectsApi } from '../../api/projects';
+import { useProjects } from '../../contexts/ProjectsContext';
 import type { BackendProject } from '../../api/types';
 
 /* ─── Icons (inline SVGs) ─── */
@@ -142,29 +142,8 @@ const projectIcon = (
 
 export default function Navbar() {
   const [collapsed, setCollapsed] = useState(false);
-  const [projects, setProjects] = useState<BackendProject[]>([]);
-  const [loadingProjects, setLoadingProjects] = useState(true);
+  const { projects, loadingProjects } = useProjects();
   const location = useLocation();
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadProjects() {
-      try {
-        const data = await projectsApi.list();
-        if (!cancelled) {
-          setProjects(data);
-        }
-      } catch {
-        if (!cancelled) setProjects([]);
-      } finally {
-        if (!cancelled) setLoadingProjects(false);
-      }
-    }
-
-    void loadProjects();
-    return () => { cancelled = true; };
-  }, []);
 
   const sidebarStyle: React.CSSProperties = {
     width: collapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-w)',
@@ -253,12 +232,22 @@ export default function Navbar() {
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {project.name}
                   </span>
-                  {/* Active dot */}
-                  <div style={{
-                    width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
-                    background: '#22c55e',
-                    boxShadow: '0 0 0 2px rgba(34,197,94,0.25)',
-                  }} title="Active" />
+                  {/* Status dot */}
+                  {(() => {
+                    const isActive = project.status === 'active';
+                    const isCompleted = project.status === 'completed' || project.status === 'archived';
+                    const isAtRisk = project.status === 'at_risk';
+                    const dotColor = isActive ? '#22c55e' : isCompleted ? '#d1d5db' : isAtRisk ? '#f59e0b' : '#9ca3af';
+                    const dotGlow = isActive ? 'rgba(34,197,94,0.25)' : isCompleted ? 'rgba(209,213,219,0.25)' : 'rgba(245,158,11,0.25)';
+                    const statusLabel = isActive ? 'Active' : isCompleted ? 'Inactive' : isAtRisk ? 'At Risk' : 'Pending';
+                    return (
+                      <div style={{
+                        width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
+                        background: dotColor,
+                        boxShadow: `0 0 0 2px ${dotGlow}`,
+                      }} title={statusLabel} />
+                    );
+                  })()}
                 </div>
               )}
             </NavLink>

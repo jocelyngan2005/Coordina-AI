@@ -81,6 +81,7 @@ export interface ProjectCreate {
   name: string;
   description?: string;
   deadline_date?: string;
+  status?: 'active' | 'at_risk' | 'completed' | 'archived';
 }
 
 export interface MemberCreate {

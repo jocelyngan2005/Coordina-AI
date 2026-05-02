@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import PageLayout from '../components/layout/PageLayout';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
-import { MOCK_PROJECT } from '../data/mockData';
 import { projectsApi } from '../api/projects';
 import { analyticsApi } from '../api/workflow';
 import type { BackendProject, ProjectAnalytics } from '../api/types';
@@ -22,20 +21,6 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
       <span style={{ fontSize: 28, fontWeight: 700, color: 'var(--grey-900)', lineHeight: 1.1 }}>{value}</span>
       {sub && <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{sub}</span>}
     </div>
-  );
-}
-
-function MemberAvatar({ initials }: { initials: string }) {
-  return (
-    <div style={{
-      width: 28, height: 28,
-      borderRadius: '50%',
-      background: 'var(--grey-900)',
-      color: 'var(--white)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: 10, fontWeight: 600,
-      flexShrink: 0,
-    }}>{initials}</div>
   );
 }
 
@@ -106,17 +91,14 @@ export default function DashboardPage() {
   }, []);
 
   // ── Derived stats ─────────────────────────────────────────────────────────
-  const mockDoneTasks = MOCK_PROJECT.tasks.filter((t) => t.status === 'done').length;
-  const mockActiveTasks = MOCK_PROJECT.tasks.filter((t) => t.status === 'in_progress').length;
-
-  const activeCount = apiAvailable ? rows.filter((r) => r.project.status === 'active').length : 1;
+  const activeCount = apiAvailable ? rows.filter((r) => r.project.status === 'active').length : 0;
   const atRiskCount = apiAvailable ? rows.filter((r) => r.project.status === 'at_risk').length : 0;
 
   const firstAnalytics = rows[0]?.analytics ?? null;
-  const totalTasks = firstAnalytics?.total_tasks ?? MOCK_PROJECT.tasks.length;
-  const doneTasks = firstAnalytics?.task_stats?.done ?? mockDoneTasks;
-  const activeTasks = firstAnalytics?.task_stats?.in_progress ?? mockActiveTasks;
-  const riskScore = firstAnalytics?.health_score ?? MOCK_PROJECT.riskScore;
+  const totalTasks = firstAnalytics?.total_tasks ?? 0;
+  const doneTasks = firstAnalytics?.task_stats?.done ?? 0;
+  const activeTasks = firstAnalytics?.task_stats?.in_progress ?? 0;
+  const riskScore = firstAnalytics?.health_score ?? 0;
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -152,7 +134,7 @@ export default function DashboardPage() {
 
       {/* Active Projects */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <h2 style={{ fontSize: 13, fontWeight: 600, color: 'var(--grey-900)' }}>Active Projects</h2>
+        <h2 style={{ fontSize: 13, fontWeight: 600, color: 'var(--grey-900)' }}>Recent Projects</h2>
         {!apiAvailable && (
           <span style={{ fontSize: 11, color: 'var(--text-3)', padding: '3px 8px', background: 'var(--grey-100)', borderRadius: 6 }}>
             Demo mode — backend offline
@@ -186,7 +168,12 @@ export default function DashboardPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <h3 style={{ fontSize: 15, fontWeight: 600 }}>{project.name}</h3>
                       <Badge
-                        label={project.status === 'at_risk' ? 'At Risk' : project.status.charAt(0).toUpperCase() + project.status.slice(1)}
+                        label={
+                          project.status === 'at_risk' ? 'At Risk' :
+                          project.status === 'completed' ? 'Completed' :
+                          project.status === 'archived' ? 'Archived' :
+                          'Active'
+                        }
                         variant={project.status === 'at_risk' ? 'black' : 'black'}
                       />
                     </div>
@@ -222,42 +209,10 @@ export default function DashboardPage() {
           })}
         </div>
       ) : (
-        // ── Fallback: mock project card ──────────────────────────────────────
-        <div
-          style={{ ...card, cursor: 'pointer', marginBottom: 24 }}
-          onClick={() => navigate('/projects/proj-001')}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--grey-400)'; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)'; }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 600 }}>{MOCK_PROJECT.name}</h3>
-                <Badge label="Active" variant="black" />
-              </div>
-              <p style={{ fontSize: 12, color: 'var(--grey-500)', maxWidth: 480 }}>{MOCK_PROJECT.description}</p>
-            </div>
-            <span style={{ fontSize: 12, color: 'var(--grey-400)', flexShrink: 0, marginLeft: 16 }}>Due {MOCK_PROJECT.deadline}</span>
-          </div>
-
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Progress</span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--grey-700)' }}>{MOCK_PROJECT.progress}%</span>
-            </div>
-            <div style={{ height: 4, background: 'var(--grey-150)', borderRadius: 2, overflow: 'hidden' }}>
-              <div style={{ width: `${MOCK_PROJECT.progress}%`, height: '100%', background: 'var(--grey-900)', transition: 'width 0.6s ease', borderRadius: 2 }} />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ display: 'flex', gap: 4 }}>
-              {MOCK_PROJECT.teamMembers.map((m) => <MemberAvatar key={m.id} initials={m.initials} />)}
-            </div>
-            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
-              {MOCK_PROJECT.teamMembers.length} members · {mockDoneTasks} of {MOCK_PROJECT.tasks.length} tasks done
-            </span>
-          </div>
+        // ── No projects available ────────────────────────────────────────────
+        <div style={{ ...card, marginBottom: 24, textAlign: 'center', padding: 40 }}>
+          <p style={{ fontSize: 14, color: 'var(--text-3)', marginBottom: 16 }}>No projects available yet.</p>
+          <Button variant="primary" size="sm" onClick={() => navigate('/projects/new')}>Create your first project</Button>
         </div>
       )}
 
