@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"
     APP_SECRET_KEY: str = "change_me"
     CORS_ORIGINS: List[str] = ["http://localhost:5173"]
+    MOCK_GLM: bool = False
 
     # File uploads
     MAX_UPLOAD_SIZE_MB: int = 20

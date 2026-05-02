@@ -14,11 +14,16 @@ router = APIRouter()
 
 @router.post("/", response_model=ProjectResponse, status_code=201)
 async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_db)):
-    project = Project(**payload.model_dump())
-    db.add(project)
-    await db.flush()
-    await db.refresh(project)
-    return project
+    try:
+        project = Project(**payload.model_dump())
+        db.add(project)
+        await db.flush()
+        await db.refresh(project)
+        return project
+    except Exception as e:
+        import traceback
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=traceback.format_exc())
 
 
 @router.get("/", response_model=list[ProjectResponse])
