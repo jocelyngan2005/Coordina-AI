@@ -81,7 +81,7 @@ export default function NewProjectPage() {
     addFiles(e.dataTransfer.files);
   }
 
-  // ─── AI ingestion — real API with error handling ────────────────────────
+  // ─── AI ingestion — local mock API ────────────────────────────────────────
 
   async function startIngestion() {
     setIngesting(true);
@@ -138,7 +138,6 @@ export default function NewProjectPage() {
         ),
       );
 
-      // Collect extracted text from successfully uploaded docs
       const extractedTexts = uploadResults
         .filter((r) => r.status === 'fulfilled')
         .map((r) => (r as PromiseFulfilledResult<Awaited<ReturnType<typeof documentsApi.upload>>>).value.extracted_text ?? '')
@@ -150,7 +149,7 @@ export default function NewProjectPage() {
 
       const documentText = extractedTexts.join('\n\n---\n\n');
 
-      // ── Step 3: Run the AI pipeline with real-time streaming ──────────────
+      // ── Step 3: Run the AI pipeline ───────────────────────────────────────
       setIngestStep(3);
       
       const BASE_URL = 'http://localhost:8000/api';
@@ -237,12 +236,10 @@ export default function NewProjectPage() {
 
       // ── Done ──────────────────────────────────────────────────────────────
       setTimeout(() => navigate(`/projects/${project.id}`), 1200);
-
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'An unknown error occurred';
-      setIngestError(errorMsg);
+      const message = err instanceof Error ? err.message : 'Failed to initialize project workspace.';
+      setIngestError(message);
       setIngesting(false);
-      console.error('Ingestion failed:', err);
     }
   }
 

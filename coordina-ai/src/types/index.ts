@@ -13,7 +13,7 @@ export interface TeamMember {
 export interface Task {
   id: string;
   title: string;
-  status: 'pending' | 'backlog' | 'in_progress' | 'done';
+  status: 'backlog' | 'in_progress' | 'done';
   assigneeId?: string;
   assignedTo: string[];
   startDate: string;
@@ -109,4 +109,27 @@ export interface UploadedDoc {
   size: string;
   uploadedAt: string;
   status: 'processing' | 'processed' | 'failed';
+}
+
+export interface EvalCriterion {
+  criterionId: string;
+  criterion: string;
+  weight: number;
+  score: number;
+  maxScore: number;
+  status: 'covered' | 'partial' | 'missing';
+  feedback: string;
+  checkpoints: { text: string; passed: boolean }[];
+}
+
+export interface UploadEvaluation {
+  overallScore: number;
+  maxScore: number;
+  pct: number;
+  grade: string;
+  verdict: 'Excellent' | 'Good' | 'Needs Work';
+  summary: string;
+  criteria: EvalCriterion[];
+  strengths: string[];
+  suggestions: string[];
 }

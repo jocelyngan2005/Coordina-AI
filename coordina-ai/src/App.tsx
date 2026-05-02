@@ -3,6 +3,7 @@ import Navbar from './components/layout/Navbar';
 import DashboardPage from './pages/DashboardPage';
 import NewProjectPage from './pages/NewProjectPage';
 import ProjectWorkspacePage from './pages/ProjectWorkspacePage';
+import SubmissionUploadPage from './pages/SubmissionUploadPage';
 import './App.css';
 
 function AppRoutes() {
@@ -22,6 +23,7 @@ function AppRoutes() {
         {backgroundLocation && (
           <Routes>
             <Route path="/projects/new" element={<NewProjectPage />} />
+            <Route path="/projects/:id/upload/:itemName" element={<SubmissionUploadPage />} />
           </Routes>
         )}
       </div>

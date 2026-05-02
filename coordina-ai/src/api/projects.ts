@@ -1,11 +1,12 @@
-import { api } from './client';
+import { mockStore } from './mockStore';
 import type { BackendProject, ProjectCreate } from './types';
 
 export const projectsApi = {
-  list: () => api.get<BackendProject[]>('/api/projects'),
-  get: (id: string) => api.get<BackendProject>(`/api/projects/${id}`),
-  create: (data: ProjectCreate) => api.post<BackendProject>('/api/projects', data),
+  list: () => mockStore.projects.list() as Promise<BackendProject[]>,
+  get: (id: string) => mockStore.projects.get(id) as Promise<BackendProject>,
+  create: (data: ProjectCreate) =>
+    mockStore.projects.create(data) as Promise<BackendProject>,
   update: (id: string, data: Partial<ProjectCreate>) =>
-    api.patch<BackendProject>(`/api/projects/${id}`, data),
-  delete: (id: string) => api.delete(`/api/projects/${id}`),
+    mockStore.projects.update(id, data) as Promise<BackendProject>,
+  delete: (id: string) => mockStore.projects.delete(id),
 };

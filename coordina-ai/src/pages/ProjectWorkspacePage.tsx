@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect, type ReactNode } from 'react';
-import { useParams } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import PageLayout from '../components/layout/PageLayout';
-import { MOCK_PROJECT, MOCK_RISKS, MOCK_RUBRIC } from '../data/mockData';
-import type { Task, RiskAlert, RubricItem, Project, ChecklistItem } from '../types';
+import { MOCK_PROJECT, MOCK_UPLOAD_GRADES, MOCK_CHECKLISTS } from '../data/mockData';
+import type { Task, RiskAlert, RubricItem, Project, ChecklistItem, TeamMember } from '../types';
 import { projectsApi } from '../api/projects';
+import { sendDiscordMessage } from '../lib/discordWebhook';
 import { tasksApi } from '../api/tasks';
 import { teamsApi } from '../api/teams';
 import { workflowApi, analyticsApi } from '../api/workflow';
@@ -232,7 +233,6 @@ const statusConfig: Record<Task['status'], { color: string; label: string }> = {
   done: { color: '#274133', label: 'Done' },
   in_progress: { color: '#ce9042', label: 'In Progress' },
   backlog: { color: '#9ca3af', label: 'Backlog' },
-  pending: { color: '#6b7280', label: 'Pending' },
 };
 
 const priorityColor: Record<string, string> = {
@@ -462,7 +462,6 @@ function GanttTimeline({ tasks }: { tasks: Task[] }) {
 /* ─── Section C: Accountability + Task List ─── */
 const TAB_LIST: { key: Task['status']; label: string; color: string }[] = [
   { key: 'in_progress', label: 'In Progress', color: '#f59e0b' },
-  { key: 'pending', label: 'Pending', color: '#6b7280' },
   { key: 'backlog', label: 'Backlog', color: 'var(--grey-400)' },
   { key: 'done', label: 'Done', color: '#22c55e' },
 ];
@@ -534,7 +533,11 @@ function AccountabilityAndTasks({ project }: { project: Project }) {
                 <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Avatar initials={s.initials} size={24} color={s.color} />
                   <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--grey-900)', flex: 1 }}>
-                    {s.name.split(' ')[0]} <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>· {s.role}</span>
+                    {s.name.split(' ')[0]}
+                    {s.id === MY_MEMBER_ID && (
+                      <span style={{ fontSize: 9, fontWeight: 700, marginLeft: 5, padding: '1px 5px', borderRadius: 4, background: 'var(--grey-900)', color: 'var(--white)' }}>You</span>
+                    )}
+                    {' '}<span style={{ color: 'var(--text-3)', fontWeight: 400 }}>· {s.role}</span>
                   </span>
                   <div style={{ textAlign: 'right' }}>
                     <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--grey-900)' }}>{s.completionPct}%</p>
@@ -580,7 +583,7 @@ function AccountabilityAndTasks({ project }: { project: Project }) {
           )}
           {visibleTasks.map((task) => {
             const m = task.assigneeId ? memberMap[task.assigneeId] : undefined;
-            const conf = task.aiConfidence ?? 0;
+            const memberSlice = task.assigneeId ? slices.find((s) => s.id === task.assigneeId) : undefined;
             return (
               <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--grey-100)', cursor: 'default' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -591,14 +594,7 @@ function AccountabilityAndTasks({ project }: { project: Project }) {
                     ))}
                   </div>
                 </div>
-                <div title={`AI Confidence: ${conf}%`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, width: 52, flexShrink: 0 }}>
-                  <span style={{ fontSize: 9, color: 'var(--text-3)' }}>AI {conf}%</span>
-                  <div style={{ width: '100%', height: 3, background: 'var(--grey-150)', borderRadius: 2 }}>
-                    <div style={{ width: `${conf}%`, height: '100%', background: conf > 80 ? '#7D2027' : conf > 60 ? '#ce9042' : '#274133', borderRadius: 2 }} />
-                  </div>
-                </div>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: priorityColor[task.priority], flexShrink: 0 }} />
-                {m && <Avatar initials={m.initials} size={20} />}
+                {m && <Avatar initials={m.initials} size={20} color={memberSlice?.color} />}
                 <span style={{ fontSize: 10, color: 'var(--text-3)', flexShrink: 0, width: 56, textAlign: 'right' }}>{task.dueDate.slice(5)}</span>
               </div>
             );
@@ -614,14 +610,48 @@ const MOCK_CHECKLIST: ChecklistItem[] = [
   { item: 'Project Brief uploaded', status: 'complete', priority: 'high' },
   { item: 'Grading Rubric uploaded', status: 'complete', priority: 'high' },
   { item: 'Meeting Transcripts submitted', status: 'complete', priority: 'medium' },
-  { item: 'Technical Documentation complete', status: 'in_progress', priority: 'high' },
+  { item: 'Technical Documentation complete', status: 'pending', priority: 'high' },
   { item: 'Test Report submitted', status: 'pending', priority: 'high' },
   { item: 'Final Presentation Slides ready', status: 'pending', priority: 'medium' },
 ];
 
-function ArtifactsCard({ checklist }: { checklist: ChecklistItem[] }) {
-  const items = checklist.length > 0 ? checklist : MOCK_CHECKLIST;
+// Items that are pre-uploaded during project setup — no manual upload button
+const SETUP_ITEMS = new Set([
+  'Project Brief uploaded',
+  'Grading Rubric uploaded',
+  'Meeting Transcripts submitted',
+]);
+
+function ArtifactsCard({
+  checklist,
+  completedItems,
+  onUpload,
+}: {
+  checklist: ChecklistItem[];
+  completedItems: Set<string>;
+  onUpload: (itemName: string, isReupload: boolean) => void;
+}) {
+  const baseItems = (checklist.length > 0 ? checklist : MOCK_CHECKLIST).map((c) => ({
+    ...c,
+    status: c.status === 'in_progress' ? ('pending' as const) : c.status,
+  }));
+
+  // Merge parent-tracked completions into the displayed list
+  const items = baseItems.map((c) =>
+    completedItems.has(c.item) ? { ...c, status: 'complete' as const } : c,
+  );
+
   const completeCount = items.filter((c) => c.status === 'complete').length;
+
+  const btnUpload: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)',
+    background: 'var(--white)', color: 'var(--grey-700)',
+    fontSize: 11, fontWeight: 500, cursor: 'pointer',
+    flexShrink: 0, whiteSpace: 'nowrap',
+    transition: 'background 0.12s, border-color 0.12s',
+  };
+
   return (
     <div style={{ ...card, padding: 0, display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '16px 18px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -633,14 +663,19 @@ function ArtifactsCard({ checklist }: { checklist: ChecklistItem[] }) {
       <div style={{ background: 'var(--white)', margin: '0 12px 12px', borderRadius: 8, display: 'flex', flexDirection: 'column', flex: 1, border: '1px solid var(--border)' }}>
         {items.map((c, i) => {
           const isComplete = c.status === 'complete';
-          const isInProgress = c.status === 'in_progress';
-          const color = isComplete ? '#274133' : isInProgress ? '#ce9042' : '#9ca3af';
+          const isSetupItem = SETUP_ITEMS.has(c.item);
+          const showUpload = !isComplete && !isSetupItem;
+          const showReupload = isComplete && !isSetupItem;
+          const color = isComplete ? '#274133' : '#9ca3af';
+
           return (
-            <div key={c.item} style={{ display: 'flex', gap: 12, padding: '10px 14px', alignItems: 'center', borderBottom: i < items.length - 1 ? '1px solid var(--grey-100)' : 'none' }}>
+            <div
+              key={c.item}
+              style={{ display: 'flex', gap: 12, padding: '10px 14px', alignItems: 'center', borderBottom: i < items.length - 1 ? '1px solid var(--grey-100)' : 'none' }}
+            >
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0 }}>
                 <circle cx="9" cy="9" r="8" stroke={color} strokeWidth="1.8" fill={isComplete ? color : 'none'} />
                 {isComplete && <polyline points="5,9 8,12 13,6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />}
-                {isInProgress && <path d="M9 1a8 8 0 0 1 0 16" stroke={color} strokeWidth="1.8" fill={color} strokeLinecap="round" />}
               </svg>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ fontSize: 12, fontWeight: 500, color: isComplete ? 'var(--grey-900)' : 'var(--grey-700)', marginBottom: 1 }}>{c.item}</p>
@@ -648,6 +683,44 @@ function ArtifactsCard({ checklist }: { checklist: ChecklistItem[] }) {
                   <p style={{ fontSize: 10, color: 'var(--text-3)' }}>{c.priority} priority</p>
                 )}
               </div>
+              {showUpload && (
+                <button
+                  style={btnUpload}
+                  onClick={() => onUpload(c.item, false)}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = 'var(--grey-50)';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--grey-400)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = 'var(--white)';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
+                  }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  Upload
+                </button>
+              )}
+              {showReupload && (
+                <button
+                  style={{ ...btnUpload, color: 'var(--grey-500)' }}
+                  onClick={() => onUpload(c.item, true)}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = 'var(--grey-50)';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--grey-400)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = 'var(--white)';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
+                  }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 .49-3.5" />
+                  </svg>
+                  Re-upload
+                </button>
+              )}
             </div>
           );
         })}
@@ -656,70 +729,13 @@ function ArtifactsCard({ checklist }: { checklist: ChecklistItem[] }) {
   );
 }
 
-/* ─── Section E: Team Tasks ─── */
-type TaskState = 'none' | 'in_progress' | 'done';
+/* ─── Section E: My Tasks ─── */
+const MY_MEMBER_ID = 'me';
 
-function MyTasksCard({ 
-  tasks, 
-  members,
-  onTaskStatusChange,
-}: { 
-  tasks: Task[]; 
-  members: import('../types').TeamMember[];
-  onTaskStatusChange?: (taskId: string, newStatus: Task['status']) => Promise<void>;
-}) {
-  const memberMap = Object.fromEntries(members.map((m) => [m.id, m]));
-  const [updating, setUpdating] = useState<string | null>(null);
-
-  const [states, setStates] = useState<Map<string, TaskState>>(() => {
-    const m = new Map<string, TaskState>();
-    tasks.forEach((t) => { m.set(t.id, t.status === 'done' ? 'done' : 'none'); });
-    return m;
-  });
-
-  useEffect(() => {
-    setStates((prev) => {
-      const next = new Map<string, TaskState>();
-      tasks.forEach((task) => {
-        next.set(task.id, task.status === 'done' ? 'done' : task.status === 'in_progress' ? 'in_progress' : 'none');
-      });
-      return next.size > 0 ? next : prev;
-    });
-  }, [tasks]);
-
-  const cycle = async (id: string) => {
-    setStates((prev) => {
-      const next = new Map(prev);
-      const cur = next.get(id) ?? 'none';
-      next.set(id, cur === 'none' ? 'in_progress' : cur === 'in_progress' ? 'done' : 'none');
-      return next;
-    });
-
-    // Update backend if callback provided
-    if (onTaskStatusChange) {
-      const task = tasks.find((t) => t.id === id);
-      if (task) {
-        const newStatus: Task['status'] = task.status === 'done' ? 'pending' : task.status === 'pending' ? 'in_progress' : 'done';
-        setUpdating(id);
-        try {
-          await onTaskStatusChange(id, newStatus);
-        } catch (err) {
-          console.error('Failed to update task:', err);
-          // Revert on error
-          setStates((prev) => {
-            const next = new Map(prev);
-            next.set(id, task.status === 'done' ? 'done' : 'none');
-            return next;
-          });
-        } finally {
-          setUpdating(null);
-        }
-      }
-    }
-  };
-
-  const doneCount = [...states.values()].filter((s) => s === 'done').length;
-  const total = tasks.length;
+function MyTasksCard({ tasks, onCycle }: { tasks: Task[]; onCycle: (id: string) => void }) {
+  const myTasks = tasks.filter((t) => t.assignedTo.includes(MY_MEMBER_ID));
+  const doneCount = myTasks.filter((t) => t.status === 'done').length;
+  const total = myTasks.length;
 
   return (
     <div style={card}>
@@ -731,17 +747,16 @@ function MyTasksCard({
         {tasks.length === 0 && (
           <p style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', padding: '24px 0' }}>No tasks assigned yet.</p>
         )}
-        {tasks.map((task, i) => {
-          const state = states.get(task.id) ?? 'none';
-          const isDone = state === 'done';
-          const isProgress = state === 'in_progress';
+        {myTasks.map((task, i) => {
+          const isDone = task.status === 'done';
+          const isProgress = task.status === 'in_progress';
           const pColor = priorityColor[task.priority];
           const assignedMember = task.assigneeId ? memberMap[task.assigneeId] : undefined;
           const isUpdating = updating === task.id;
           return (
             <div
               key={task.id}
-              onClick={() => cycle(task.id)}
+              onClick={() => onCycle(task.id)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '10px 14px',
@@ -807,9 +822,25 @@ const actionsByRecommendedType: Record<string, AlertAction[]> = {
   ambiguity: [{ label: 'Request Clarification', variant: 'primary' }, { label: 'Flag for Review', variant: 'ghost' }],
 };
 
-function NotificationBell({ notifications }: { notifications: RiskAlert[] }) {
+function NotificationBell({
+  notifications,
+  onReassignTask,
+  onAdjustTimeline,
+  projectName,
+  teamMembers,
+}: {
+  notifications: RiskAlert[];
+  onReassignTask: (memberId: string) => string;
+  onAdjustTimeline: () => string;
+  projectName: string;
+  teamMembers: TeamMember[];
+}) {
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [resolvedAlerts, setResolvedAlerts] = useState<Set<string>>(new Set());
+  const [escalatedAlerts, setEscalatedAlerts] = useState<Set<string>>(new Set());
+  const [flaggedAlerts, setFlaggedAlerts] = useState<Set<string>>(new Set());
+  const [replannedAlerts, setReplannedAlerts] = useState<Set<string>>(new Set());
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }
@@ -817,15 +848,71 @@ function NotificationBell({ notifications }: { notifications: RiskAlert[] }) {
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
-  function handleAction(label: string) {
-    setToast(`"${label}" triggered`);
-    setTimeout(() => setToast(null), 2500);
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2800);
   }
 
+  function handleAction(label: string, risk: RiskAlert) {
+    switch (label) {
+      case 'Send Reminder': {
+        // Try by ID first; if remapped by pipeline, extract name from the alert message
+        // (risk.message format for inactivity: "Full Name — reason…")
+        const member = teamMembers.find((m) => m.id === risk.memberId);
+        const nameFromMessage = risk.message.split(/\s[—–-]\s/)[0].trim();
+        const memberName = member?.name ?? (nameFromMessage || 'your teammate');
+        sendDiscordMessage(
+          `👋 Hey **${memberName}**, just a friendly reminder to check in on your tasks for **${projectName}**! ` +
+          `The team is counting on you — please get back on track when you can. 💪`,
+        );
+        showToast(`Reminder sent to ${memberName} via Discord`);
+        break;
+      }
+      case 'Reassign Task': {
+        showToast(onReassignTask(risk.memberId ?? ''));
+        break;
+      }
+      case 'Adjust Timeline': {
+        showToast(onAdjustTimeline());
+        break;
+      }
+      case 'Escalate':
+        setEscalatedAlerts((prev) => new Set([...prev, risk.id]));
+        sendDiscordMessage(
+          `@here ⚡ **Speed-up alert for ${projectName}!**\n` +
+          `${risk.message}\n\n` +
+          `We're at risk of missing our deadline. Everyone please prioritise your open tasks and check in with any blockers ASAP.`,
+        );
+        showToast('Alert escalated to project supervisor');
+        break;
+      case 'Request Clarification':
+        sendDiscordMessage(
+          `❓ **Clarification needed on: "${risk.message}"**\n` +
+          `${risk.detail}\n\n` +
+          `Can someone from the **${projectName}** team address this before we proceed?`,
+        );
+        showToast('Clarification request sent to team channel');
+        break;
+      case 'Flag for Review':
+        setFlaggedAlerts((prev) => new Set([...prev, risk.id]));
+        showToast('Alert flagged — supervisor notified for review');
+        break;
+      case 'Resolve Dependency':
+        setResolvedAlerts((prev) => new Set([...prev, risk.id]));
+        showToast('Dependency marked as resolved — dependent tasks unblocked');
+        break;
+      case 'Replan Tasks':
+        setReplannedAlerts((prev) => new Set([...prev, risk.id]));
+        showToast('Task schedule updated — affected tasks rescheduled');
+        break;
+    }
+  }
+
+  const visibleNotifications = notifications.filter((r) => !resolvedAlerts.has(r.id));
   const btnBase: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 5, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: '1px solid transparent', transition: 'opacity .15s', background: 'none' };
   const btnPrimary: React.CSSProperties = { ...btnBase, background: 'var(--grey-900)', color: 'var(--white)', borderColor: 'var(--grey-900)' };
   const btnGhost: React.CSSProperties = { ...btnBase, background: 'transparent', color: 'var(--grey-700)', borderColor: 'var(--border)' };
-  const hasAlerts = notifications.length > 0;
+  const hasAlerts = visibleNotifications.length > 0;
 
   return (
     <>
@@ -843,45 +930,53 @@ function NotificationBell({ notifications }: { notifications: RiskAlert[] }) {
             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
           </svg>
           {hasAlerts && (
-            <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 99, background: 'var(--grey-900)', color: 'var(--white)', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', border: '2px solid var(--white)' }}>{notifications.length}</span>
+            <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 99, background: 'var(--grey-900)', color: 'var(--white)', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', border: '2px solid var(--white)' }}>{visibleNotifications.length}</span>
           )}
         </button>
         {open && (
           <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 360, maxHeight: 460, overflowY: 'auto', background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 1000 }}>
             <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--grey-900)' }}>Intervention &amp; Risk</span>
-              {hasAlerts && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'var(--grey-150)', color: 'var(--grey-800)' }}>{notifications.length} active</span>}
+              <span style={{ fontSize: 18, fontWeight: 400, color: 'var(--grey-900)' }}>Intervention &amp; Risk</span>
+              {hasAlerts && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'var(--grey-150)', color: 'var(--grey-800)' }}>{visibleNotifications.length} active</span>}
             </div>
-            {notifications.length === 0 ? (
+            {visibleNotifications.length === 0 ? (
               <div style={{ padding: '24px 16px', textAlign: 'center' }}><p style={{ fontSize: 13, color: 'var(--text-3)' }}>No active alerts</p></div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {notifications.map((risk, i) => (
-                  <div key={risk.id} style={{ padding: '12px 16px', borderBottom: i < notifications.length - 1 ? '1px solid var(--grey-100)' : 'none' }}>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>{typeIcon[risk.type]}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                          <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--grey-900)' }}>{risk.message}</p>
-                          <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, flexShrink: 0, background: severityBg[risk.severity], color: severityColor[risk.severity] }}>{risk.severity}</span>
+                {visibleNotifications.map((risk, i) => {
+                  const isEscalated = escalatedAlerts.has(risk.id);
+                  const isFlagged = flaggedAlerts.has(risk.id);
+                  const isReplanned = replannedAlerts.has(risk.id);
+                  return (
+                    <div key={risk.id} style={{ padding: '12px 16px', borderBottom: i < visibleNotifications.length - 1 ? '1px solid var(--grey-100)' : 'none' }}>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                        <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>{typeIcon[risk.type]}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
+                            <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--grey-900)' }}>{risk.message}</p>
+                            <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, flexShrink: 0, background: severityBg[risk.severity], color: severityColor[risk.severity] }}>{risk.severity}</span>
+                            {isEscalated && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, flexShrink: 0, background: '#fdf3e3', color: '#b45309' }}>Escalated</span>}
+                            {isFlagged && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, flexShrink: 0, background: '#eff6ff', color: '#1d4ed8' }}>Flagged</span>}
+                            {isReplanned && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, flexShrink: 0, background: '#f0fdf4', color: '#15803d' }}>Rescheduled</span>}
+                          </div>
+                          <p style={{ fontSize: 11, color: 'var(--grey-600)', lineHeight: 1.4, marginBottom: 7 }}>{risk.detail}</p>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 4 }}>
+                            {(actionsByRecommendedType[risk.recommended_action_type ?? ''] ?? actionsByRecommendedType.scope_issue).map((btn) => (
+                              <button
+                                key={btn.label}
+                                style={{ ...(btn.variant === 'primary' ? btnPrimary : btnGhost), justifyContent: 'center', width: '100%' }}
+                                onClick={() => handleAction(btn.label, risk)}
+                                onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = '0.75')}
+                                onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = '1')}
+                              >{btn.label}</button>
+                            ))}
+                          </div>
+                          <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{risk.timestamp}</span>
                         </div>
-                        <p style={{ fontSize: 11, color: 'var(--grey-600)', lineHeight: 1.4, marginBottom: 7 }}>{risk.detail}</p>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 4 }}>
-                          {(actionsByRecommendedType[risk.recommended_action_type ?? ''] ?? actionsByRecommendedType.scope_issue).map((btn) => (
-                            <button
-                              key={btn.label}
-                              style={{ ...(btn.variant === 'primary' ? btnPrimary : btnGhost), justifyContent: 'center', width: '100%' }}
-                              onClick={() => handleAction(btn.label)}
-                              onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = '0.75')}
-                              onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = '1')}
-                            >{btn.label}</button>
-                          ))}
-                        </div>
-                        <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{risk.timestamp}</span>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1089,49 +1184,18 @@ function WorkspaceSkeleton() {
 export default function ProjectWorkspacePage() {
   const { id: urlId } = useParams<{ id: string }>();
   const projectId = urlId ?? 'proj-001';
-  const isMockId = projectId === 'proj-001';
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const [project, setProject] = useState<Project | null>(null);
-  const [rubric, setRubric] = useState<RubricItem[]>(MOCK_RUBRIC);
-  const [risks, setRisks] = useState<RiskAlert[]>(MOCK_RISKS);
+  const [rubric, setRubric] = useState<RubricItem[]>([]);
+  const [risks, setRisks] = useState<RiskAlert[]>([]);
   const [submissionChecklist, setSubmissionChecklist] = useState<ChecklistItem[]>([]);
-  const [milestones, setMilestones] = useState<Record<string, unknown>[]>([]);
-  const [loading, setLoading] = useState(!isMockId);
-  const [apiAvailable, setApiAvailable] = useState(true);
-  const [workflowState, setWorkflowState] = useState<Record<string, unknown> | null>(null);
-  const [dataSource, setDataSource] = useState<'glm' | 'mock'>('mock');
-
-  // Handle task status changes and update backend + local state
-  const handleTaskStatusChange = async (taskId: string, newStatus: Task['status']) => {
-    if (!project) return;
-
-    // Map Task status to BackendTask status (pending → backlog for backend compatibility)
-    const backendStatus = (newStatus === 'pending' ? 'backlog' : newStatus) as 'in_progress' | 'backlog' | 'done';
-
-    // Update backend
-    await tasksApi.update(taskId, { status: backendStatus });
-
-    // Update local state to reflect change
-    setProject((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        tasks: prev.tasks.map((t) =>
-          t.id === taskId ? { ...t, status: newStatus } : t
-        ),
-      };
-    });
-  };
+  const [loading, setLoading] = useState(true);
+  const [taskOverrides, setTaskOverrides] = useState<Map<string, Task['status']>>(new Map());
+  const [completedItems, setCompletedItems] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (isMockId) {
-      setProject(MOCK_PROJECT);
-      setRubric(MOCK_RUBRIC);
-      setRisks(MOCK_RISKS);
-      setLoading(false);
-      return;
-    }
-
     let cancelled = false;
 
     async function fetchAll() {
@@ -1141,7 +1205,7 @@ export default function ProjectWorkspacePage() {
             projectsApi.get(projectId),
             tasksApi.listByProject(projectId),
             teamsApi.listByProject(projectId),
-            workflowApi.getState(projectId).catch(() => null),
+            workflowApi.getState(projectId),
             analyticsApi.projectOverview(projectId).catch(() => null),
           ]);
 
@@ -1153,96 +1217,51 @@ export default function ProjectWorkspacePage() {
             ? Math.round(analytics.health_score)
             : 0;
 
-        if (workflowState) {
-          // Store workflow state as-is (already typed as WorkflowState)
-          setWorkflowState(workflowState as unknown as Record<string, unknown>);
-          setDataSource('glm');
-          
-          // Use GLM planning tasks if available, fall back to DB tasks
-          const glmTasks = Array.isArray(workflowState.tasks) && workflowState.tasks.length > 0
-            ? mapTasks(workflowState.tasks as Record<string, unknown>[])
-            : backendTasks.map((t) => ({
-                id: t.id, title: t.title, status: t.status,
-                assigneeId: t.assignee_id ?? undefined,
-                assignedTo: t.assignee_id ? [t.assignee_id] : [],
-                startDate: t.created_at?.slice(0, 10) ?? '',
-                dueDate: t.due_date?.slice(0, 10) ?? '',
-                priority: t.priority, tags: [], description: t.description ?? '',
-              } as import('../types').Task));
+        // Use GLM planning tasks if available, fall back to DB tasks
+        const glmTasks = Array.isArray(workflowState.tasks) && workflowState.tasks.length > 0
+          ? mapTasks(workflowState.tasks as Record<string, unknown>[])
+          : backendTasks.map((t) => ({
+              id: t.id, title: t.title, status: t.status,
+              assigneeId: t.assignee_id ?? undefined,
+              assignedTo: t.assignee_id ? [t.assignee_id] : [],
+              startDate: t.created_at?.slice(0, 10) ?? '',
+              dueDate: t.due_date?.slice(0, 10) ?? '',
+              priority: t.priority, tags: [], description: t.description ?? '',
+            } as import('../types').Task));
 
-          const backendTaskByKey = new Map(
-            backendTasks.map((task) => [task.task_id ?? task.id, task]),
-          );
-          const syncedTasks = glmTasks.map((task) => {
-            const backendTask = backendTaskByKey.get(task.id);
-            if (!backendTask) return task;
-            return {
-              ...task,
-              id: backendTask.id,  // ← Use backend UUID as frontend task ID for updates
-              status: backendTask.status,
-              assigneeId: backendTask.assignee_id ?? task.assigneeId,
-              assignedTo: backendTask.assignee_id ? [backendTask.assignee_id] : task.assignedTo,
-              dueDate: backendTask.due_date?.slice(0, 10) ?? task.dueDate,
-            };
-          });
+        // Use GLM coordination members if available, fall back to DB members
+        const roleAssignments = (workflowState.role_assignments ?? []) as Record<string, unknown>[];
+        const contributionBalance = (workflowState.contribution_balance ?? []) as Record<string, unknown>[];
+        const glmMembers = roleAssignments.length > 0
+          ? mapTeamMembers(roleAssignments, contributionBalance)
+          : backendMembers.map((m) => ({
+              id: m.id, name: m.name, role: m.skills[0] ?? 'Member',
+              initials: m.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2),
+              contributionScore: Math.round(m.contribution_score),
+              lastActive: 'Recently', taskCount: 0,
+            }));
 
-          // Use GLM coordination members if available, fall back to DB members
-          const roleAssignments = (workflowState.role_assignments ?? []) as Record<string, unknown>[];
-          const contributionBalance = (workflowState.contribution_balance ?? []) as Record<string, unknown>[];
-          const glmMembers = roleAssignments.length > 0
-            ? mapTeamMembers(roleAssignments, contributionBalance)
-            : backendMembers.map((m) => ({
-                id: m.id, name: m.name, role: m.skills[0] ?? 'Member',
-                initials: m.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2),
-                contributionScore: Math.round(m.contribution_score),
-                lastActive: 'Recently', taskCount: 0,
-              }));
+        const mapped = mapProject(backendProject, backendTasks, backendMembers, completionPct, riskScore);
+        setProject({ ...mapped, tasks: glmTasks, teamMembers: glmMembers });
 
-          const mapped = mapProject(backendProject, backendTasks, backendMembers, completionPct, riskScore);
-          setProject({ ...mapped, tasks: syncedTasks, teamMembers: glmMembers });
+        // Submission readiness
+        const submissionResult = workflowState.submission_report as Record<string, unknown>;
+        const mappedRubric = mapRubric(submissionResult);
+        setRubric(mappedRubric.length > 0 ? mappedRubric : (extractRubric(submissionResult) ?? []));
 
-          // Submission readiness
-          const submissionResult = workflowState.submission_report as Record<string, unknown>;
-          const mappedRubric = mapRubric(submissionResult);
-          if (mappedRubric.length > 0) setRubric(mappedRubric);
-          else {
-            const fallback = extractRubric(submissionResult);
-            if (fallback) setRubric(fallback);
-          }
-
-          const rawChecklist = submissionResult?.submission_checklist;
-          if (Array.isArray(rawChecklist) && rawChecklist.length > 0) {
-            setSubmissionChecklist(rawChecklist as ChecklistItem[]);
-          }
-
-          // Risk detection
-          const riskResult = workflowState.last_risk_report as Record<string, unknown>;
-          const executedAt = String((workflowState.last_risk_report as Record<string, unknown>)?.executed_at ?? '');
-          const mappedRisks = mapRisks(riskResult, executedAt);
-          if (mappedRisks.length > 0) setRisks(mappedRisks);
-          else {
-            const fallback = extractRisks(riskResult);
-            if (fallback) setRisks(fallback);
-          }
-
-          // Milestones extraction
-          const rawMilestones = Array.isArray(workflowState.milestones)
-            ? (workflowState.milestones as Record<string, unknown>[])
-            : [];
-          if (rawMilestones.length > 0) {
-            setMilestones(rawMilestones);
-          }
-        } else {
-          setDataSource('mock');
-          const mapped = mapProject(backendProject, backendTasks, backendMembers, completionPct, riskScore);
-          setProject(mapped);
+        const rawChecklist = submissionResult?.submission_checklist;
+        if (Array.isArray(rawChecklist) && rawChecklist.length > 0) {
+          setSubmissionChecklist(rawChecklist as ChecklistItem[]);
         }
 
-        setApiAvailable(true);
+        // Risk detection
+        const riskResult = workflowState.last_risk_report as Record<string, unknown>;
+        const executedAt = String((workflowState.last_risk_report as Record<string, unknown>)?.executed_at ?? '');
+        const mappedRisks = mapRisks(riskResult, executedAt);
+        setRisks(mappedRisks.length > 0 ? mappedRisks : (extractRisks(riskResult) ?? []));
       } catch {
         if (!cancelled) {
           setProject(MOCK_PROJECT);
-          setApiAvailable(false);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -1251,11 +1270,144 @@ export default function ProjectWorkspacePage() {
 
     void fetchAll();
     return () => { cancelled = true; };
-  }, [projectId, isMockId]);
+  }, [projectId]);
+
+  // ── Handle upload completion signalled back via location state ──────────────
+  useEffect(() => {
+    const state = location.state as { uploadedItem?: string } | null;
+    const uploaded = state?.uploadedItem;
+    if (!uploaded) return;
+    // Mark the item complete
+    setCompletedItems((prev) => new Set([...prev, uploaded]));
+    // Apply rubric score updates from mock grading
+    const grades = MOCK_UPLOAD_GRADES[`${projectId}::${uploaded}`] ?? MOCK_UPLOAD_GRADES[uploaded];
+    if (grades) {
+      setRubric((prev) =>
+        prev.map((r) => {
+          const update = grades.find((g) => g.rubricId === r.id);
+          return update
+            ? { ...r, score: update.newScore, status: update.newStatus, evidence: update.newEvidence }
+            : r;
+        }),
+      );
+    }
+    // Clear the flag so it doesn't re-apply on future renders
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.state]);
 
   if (loading) return <WorkspaceSkeleton />;
 
   const p = project ?? MOCK_PROJECT;
+
+  function handleReassignTask(memberId: string): string {
+    const currentProject = project ?? MOCK_PROJECT;
+    const inactiveMember = currentProject.teamMembers.find((m) => m.id === memberId);
+    if (!inactiveMember) return 'Member not found — no changes made';
+
+    const otherMembers = currentProject.teamMembers.filter((m) => m.id !== memberId);
+    if (otherMembers.length === 0) return 'No other members available for reassignment';
+
+    const unfinishedTasks = currentProject.tasks.filter(
+      (t) => (t.assigneeId === memberId || t.assignedTo.includes(memberId)) && t.status !== 'done',
+    );
+
+    if (unfinishedTasks.length === 0) {
+      return `${inactiveMember.name.split(' ')[0]} has no unfinished tasks`;
+    }
+
+    // Round-robin redistribution among the remaining members
+    const reassignMap = new Map<string, string>(); // taskId → newMemberId
+    unfinishedTasks.forEach((task, idx) => {
+      reassignMap.set(task.id, otherMembers[idx % otherMembers.length].id);
+    });
+
+    setProject((prev) => {
+      const base = prev ?? MOCK_PROJECT;
+      const updatedTasks = base.tasks.map((t) => {
+        const newMemberId = reassignMap.get(t.id);
+        if (!newMemberId) return t;
+        return { ...t, assigneeId: newMemberId, assignedTo: [newMemberId] };
+      });
+      const updatedMembers = base.teamMembers.map((m) => {
+        if (m.id === memberId) {
+          return { ...m, contributionScore: Math.max(0, m.contributionScore - 15) };
+        }
+        const gained = [...reassignMap.values()].filter((id) => id === m.id).length;
+        if (gained > 0) {
+          return { ...m, contributionScore: Math.min(100, m.contributionScore + gained * 8) };
+        }
+        return m;
+      });
+      return { ...base, tasks: updatedTasks, teamMembers: updatedMembers };
+    });
+
+    const assignedTo = [...new Set([...reassignMap.values()])]
+      .map((id) => currentProject.teamMembers.find((m) => m.id === id)?.name.split(' ')[0] ?? id)
+      .join(', ');
+
+    return `${unfinishedTasks.length} task${unfinishedTasks.length !== 1 ? 's' : ''} reassigned from ${inactiveMember.name.split(' ')[0]} to ${assignedTo}`;
+  }
+
+  function handleAdjustTimeline(): string {
+    const currentProject = project ?? MOCK_PROJECT;
+    const today = new Date();
+    const todayMs = today.getTime();
+
+    const targetTasks = currentProject.tasks.filter(
+      (t) => t.status === 'backlog' || t.status === 'in_progress',
+    );
+
+    if (targetTasks.length === 0) return 'No active tasks to adjust';
+
+    setProject((prev) => {
+      const base = prev ?? MOCK_PROJECT;
+      const updatedTasks = base.tasks.map((t) => {
+        if (t.status !== 'backlog' && t.status !== 'in_progress') return t;
+
+        const dueMs = new Date(t.dueDate).getTime();
+        const remainingMs = dueMs - todayMs;
+        if (remainingMs <= 86_400_000) return t; // ≤1 day left — leave it alone
+
+        const newDueDate = new Date(todayMs + Math.round(remainingMs * 0.75))
+          .toISOString().slice(0, 10);
+
+        // Also compress the start date if the task hasn't begun yet
+        const startMs = new Date(t.startDate).getTime();
+        const newStartDate = startMs > todayMs
+          ? new Date(todayMs + Math.round((startMs - todayMs) * 0.75)).toISOString().slice(0, 10)
+          : t.startDate;
+
+        return { ...t, dueDate: newDueDate, startDate: newStartDate };
+      });
+      return { ...base, tasks: updatedTasks };
+    });
+
+    return `Timeline compressed — ${targetTasks.length} task${targetTasks.length !== 1 ? 's' : ''} shortened by ~25%`;
+  }
+
+  function cycleTask(id: string) {
+    setTaskOverrides((prev) => {
+      const next = new Map(prev);
+      const current = next.get(id) ?? p.tasks.find((t) => t.id === id)?.status ?? 'backlog';
+      const cycled: Task['status'] =
+        current === 'backlog' ? 'in_progress' :
+        current === 'in_progress' ? 'done' : 'backlog';
+      next.set(id, cycled);
+      return next;
+    });
+  }
+
+  const mergedTasks = p.tasks.map((t) =>
+    taskOverrides.has(t.id) ? { ...t, status: taskOverrides.get(t.id)! } : t
+  );
+
+  function handleUploadClick(itemName: string, isReupload: boolean) {
+    navigate(
+      `/projects/${projectId}/upload/${encodeURIComponent(itemName)}`,
+      { state: { backgroundLocation: location, isReupload } },
+    );
+  }
+
   const missing = rubric.filter((r) => r.status === 'missing').length;
   const partial = rubric.filter((r) => r.status === 'partial').length;
   const goNogo = missing === 0 && partial <= 1 ? 'GO' : 'NO-GO';
@@ -1267,11 +1419,6 @@ export default function ProjectWorkspacePage() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
             <h1 style={{ fontSize: 28, fontWeight: 400, color: 'var(--grey-900)', lineHeight: 1.2 }}>{p.name}</h1>
-            {!apiAvailable && (
-              <span style={{ fontSize: 11, color: 'var(--text-3)', padding: '3px 8px', background: 'var(--grey-100)', borderRadius: 6 }}>
-                Demo mode
-              </span>
-            )}
           </div>
           <p style={{ fontSize: 13, color: 'var(--text-3)' }}>
             {p.deadline ? `Due ${p.deadline} · ` : ''}{p.teamMembers.length} members · Risk {p.riskScore}%
@@ -1284,7 +1431,13 @@ export default function ProjectWorkspacePage() {
               <span style={{ fontSize: 12, fontWeight: 600, color: '#15803d' }}>Ready for submission</span>
             </div>
           )}
-          <NotificationBell notifications={risks} />
+          <NotificationBell
+            notifications={risks}
+            onReassignTask={handleReassignTask}
+            onAdjustTimeline={handleAdjustTimeline}
+            projectName={p.name}
+            teamMembers={p.teamMembers}
+          />
         </div>
       </div>
 
@@ -1293,11 +1446,15 @@ export default function ProjectWorkspacePage() {
         <RiskDetailsPanel risks={risks} />
         <MilestonesTimeline milestones={milestones} />
         <RubricTracker rubric={rubric} />
-        <GanttTimeline tasks={p.tasks} />
+        <GanttTimeline tasks={mergedTasks} />
         <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr 2fr', gap: 14, alignItems: 'start' }}>
-          <AccountabilityAndTasks project={p} />
-          <MyTasksCard tasks={p.tasks} members={p.teamMembers} onTaskStatusChange={handleTaskStatusChange} />
-          <ArtifactsCard checklist={submissionChecklist} />
+          <AccountabilityAndTasks project={{ ...p, tasks: mergedTasks }} />
+          <MyTasksCard tasks={mergedTasks} onCycle={cycleTask} />
+          <ArtifactsCard
+            checklist={submissionChecklist.length > 0 ? submissionChecklist : (MOCK_CHECKLISTS[projectId] ?? MOCK_CHECKLIST)}
+            completedItems={completedItems}
+            onUpload={handleUploadClick}
+          />
         </div>
       </div>
     </PageLayout>

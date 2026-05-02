@@ -1,13 +1,13 @@
-import { api } from './client';
+import { mockStore } from './mockStore';
 import type { BackendTask } from './types';
 
 export const tasksApi = {
   listByProject: (projectId: string) =>
-    api.get<BackendTask[]>(`/api/tasks/project/${projectId}`),
-  get: (taskId: string) => api.get<BackendTask>(`/api/tasks/${taskId}`),
+    mockStore.tasks.listByProject(projectId) as Promise<BackendTask[]>,
+  get: (taskId: string) => mockStore.tasks.get(taskId) as Promise<BackendTask>,
   update: (
     taskId: string,
     data: Partial<Pick<BackendTask, 'status' | 'completion_pct' | 'assignee_id' | 'title' | 'description' | 'priority' | 'due_date'>>,
-  ) => api.patch<BackendTask>(`/api/tasks/${taskId}`, data),
-  delete: (taskId: string) => api.delete(`/api/tasks/${taskId}`),
+  ) => mockStore.tasks.update(taskId, data) as Promise<BackendTask>,
+  delete: (taskId: string) => mockStore.tasks.delete(taskId),
 };
