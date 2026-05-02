@@ -116,8 +116,29 @@ class WorkflowEngine:
             ))
 
         # Persist goals into project state
-        state["structured_goals"] = result.get("structured_goals", [])
-        state["rubric_criteria"] = result.get("grading_priorities", [])
+        if result.get("structured_goals"):
+            state["structured_goals"] = state.get("structured_goals", []) + result.get("structured_goals", [])
+        if result.get("grading_priorities"):
+            state["rubric_criteria"] = state.get("rubric_criteria", []) + result.get("grading_priorities", [])
+        
+        # Merge newly extracted members with existing members
+        extracted_members = result.get("team_members", [])
+        if extracted_members:
+            existing_members = state.get("members", [])
+            current_count = len(existing_members)
+            for i, m in enumerate(extracted_members):
+                existing_members.append({
+                    "id": f"M{current_count + i + 1}",
+                    "name": m.get("name", f"Member {current_count + i + 1}"),
+                    "skills": m.get("skills", []),
+                    "past_behaviour": m.get("past_behaviour"),
+                    "contribution_score": 0.0,
+                    "availability": "full-time",
+                    "experience_level": "mid",
+                })
+            state["members"] = existing_members
+            state["team_size"] = len(existing_members)
+
         state["ambiguities"] = ambiguities
         state["ambiguity_resolution"] = ambiguity_resolution
         state["document_type"] = document_type
@@ -191,6 +212,7 @@ class WorkflowEngine:
             "project_start_date": state.get("project_start_date") or today.isoformat(),
             "existing_tasks": compact_existing_tasks,
             "days_available": days_available,
+            "members": state.get("members", []),
         }
 
         output = await self._agents["planning"].execute(context)
@@ -531,8 +553,8 @@ class WorkflowEngine:
                 logger.debug(f"[WorkflowEngine] Preparing rubric document for analysis")
                 return document_text.strip()
             
-            elif document_type == "brief":
-                # Briefs typically don't need special parsing
+            elif document_type == "brief" or document_type == "team_profile":
+                # Briefs and team profiles don't need special parsing
                 return document_text.strip()
             
             else:

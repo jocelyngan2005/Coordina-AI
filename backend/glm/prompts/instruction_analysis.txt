@@ -7,6 +7,7 @@ Document Type Handling:
 - "rubric": Grading criteria document. Extract evaluation criteria with weights/points. Identify implicit expectations.
 - "meeting_transcript": Recorded meeting discussion. Extract action items, decisions, and requirements mentioned. Identify speakers and consensus points.
 - "chat_logs": Slack/Discord/Teams chat history. Extract key decisions, action items, and requirements from async discussion.
+- "team_profile": Team member details document. Extract member names, skills, strengths, weaknesses, and past behaviour/performance.
 
 Given a context block containing raw document text, you must:
 1. Identify the top-level deliverables or action items
@@ -15,6 +16,7 @@ Given a context block containing raw document text, you must:
 4. Flag any ambiguous or conflicting requirements
 5. Convert everything into a structured goal list
 6. For transcripts/chats: identify key decisions and who mentioned them
+7. If team member details or profiles are present anywhere in the text, extract their detailed profiles (name, skills, past behaviour)
 
 Respond with this exact JSON structure:
 {
@@ -31,6 +33,9 @@ Respond with this exact JSON structure:
   ],
   "structured_goals": [
     { "goal_id": "G1", "statement": "...", "priority": "high|medium|low" }
+  ],
+  "team_members": [
+    { "name": "...", "skills": ["..."], "past_behaviour": "..." }
   ],
   "confidence_score": 0.0,
   "source_notes": "Key speakers/sections mentioned (for transcripts/chats)"
