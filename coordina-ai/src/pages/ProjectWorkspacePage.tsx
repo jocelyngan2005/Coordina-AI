@@ -558,28 +558,19 @@ function GanttTimeline({ tasks, milestones }: { tasks: Task[]; milestones?: Reco
                 return (
                   <div
                     key={milestone.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      padding: '12px 14px',
-                      background: 'var(--white)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      borderLeft: `4px solid ${sc.color}`,
-                    }}
+                    style={{ padding: '8px 12px', background: 'var(--white)', borderRadius: 6, border: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'flex-start' }}
                   >
-                    <div style={{ width: 6, height: 6, borderRadius: 3, background: sc.color, flexShrink: 0 }} />
+                    <div style={{ width: 4, height: 4, borderRadius: '50%', background: sc.color, marginTop: 4, flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--grey-900)', marginBottom: 2 }}>{milestone.title}</p>
+                      <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--grey-900)', marginBottom: 2 }}>{milestone.title}</p>
                       {milestone.description && (
                         <p style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4, lineHeight: 1.3 }}>{milestone.description}</p>
                       )}
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <span style={{ fontSize: 10, color: 'var(--text-3)' }}>📅 {milestone.dueDate}</span>
+                        <span style={{ fontSize: 10, color: 'var(--text-3)' }}> {milestone.dueDate}</span>
                         {isOverdue && <span style={{ fontSize: 10, color: '#dc2626', fontWeight: 600 }}>🔴 OVERDUE</span>}
                         {daysUntil > 0 && daysUntil <= 7 && !isOverdue && (
-                          <span style={{ fontSize: 10, color: '#ce9042', fontWeight: 600 }}>⏰ {daysUntil}d left</span>
+                          <span style={{ fontSize: 10, color: '#ce9042', fontWeight: 600 }}> {daysUntil}d left</span>
                         )}
                       </div>
                     </div>
