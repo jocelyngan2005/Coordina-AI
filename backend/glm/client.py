@@ -156,8 +156,20 @@ class GLMClient:
                 "recovery_actions": [],
                 "confidence_score": 0.95,
                 "analysis": "Mock analysis for performance testing.",
-                "tasks": [],
-                "milestones": []
+                "structured_goals": [
+                    {"goal_id": "G1", "statement": "Initialize project architecture", "priority": "high"},
+                    {"goal_id": "G2", "statement": "Implement core features", "priority": "medium"}
+                ],
+                "tasks": [
+                    {
+                        "id": "T1", "title": "Setup repository", "status": "todo", "priority": "high", 
+                        "estimated_hours": 4, "phase": "Setup", "dependencies": [], "assigned_to": []
+                    }
+                ],
+                "milestones": [
+                    {"id": "M1", "title": "Infrastructure Ready", "deadline": "2026-06-01"}
+                ],
+                "role_assignments": []
             })
 
         payload = self._build_payload(
