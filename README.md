@@ -2,15 +2,14 @@
 
 Autonomous AI Teammate & Workflow Orchestrator
 
-Coordina AI is a stateful, multi-agent workflow system for student group projects. It ingests unstructured project inputs, reasons over them with Z.AI GLM, and turns them into structured execution plans, coordination actions, risk signals, and submission readiness reports.
+Coordina AI is a stateful, multi-agent workflow system for student group projects. It ingests unstructured project inputs, reasons over them with Gemini AI, and turns them into structured execution plans, coordination actions, risk signals, and submission readiness reports.
 
-## Deliverables 
+## Deliverables for Finals  
 
-* Pitching Video: [Click here](https://youtu.be/d8d10Nr__qg)
-* Pitch Deck: [Click here](https://drive.google.com/file/d/1KMpg7B9_b4oS4YDCgVmtsOgEKhhEnQOm/view?usp=sharing)
-* Product Requirement Document (PRD): [Click here](https://drive.google.com/file/d/1JlMQw578kyyZ7IKvLywos9grjIRjwyjM/view?usp=sharing)
-* System Analysis Document (SAD): [Click here](https://drive.google.com/file/d/1KJYphgDKD6bp9uBak2-qy4zHDSvBJfuk/view?usp=sharing)
-* Quality Assurance Testing Document (QATD): [Click here](https://drive.google.com/file/d/1q1EoJD5Op9Gz72NwRRJhP2axypO0Ljoe/view?usp=sharing)
+* Pitch Deck: https://drive.google.com/file/d/1vQ1GI4-tDEv86JDkWxlCQtDJd2jeaUcv/view?usp=sharing
+* Refined QATD: https://drive.google.com/file/d/1k-BhqFRAS3cOC40AVFSL-QRKsRndnIcb/view?usp=sharing 
+* Deployment PLan: https://drive.google.com/file/d/1xkZRfLc0FDckuJojEDrkecwbXtabG0Xt/view?usp=sharing 
+* Business Proposal: https://drive.google.com/file/d/1g8v5oGDfaejGL9Csgjh7aH1YF6L2GjMO/view?usp=drive_link 
 
 ## Why it exists
 
