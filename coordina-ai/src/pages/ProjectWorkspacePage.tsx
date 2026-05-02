@@ -46,15 +46,7 @@ function AnalysisPanel({ state, dataSource }: { state: Record<string, unknown> |
     <div style={card}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <div style={{ fontSize: 18, fontWeight: 400, color: 'var(--grey-900)' }}>
-          📋 Analysis Results
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 9, fontWeight: 500, color: 'var(--text-3)', background: 'var(--white)', padding: '2px 6px', borderRadius: 3, textTransform: 'capitalize' }}>
-            {documentType}
-          </span>
-          <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-3)', background: 'var(--white)', padding: '3px 8px', borderRadius: 4 }}>
-            {dataSource === 'glm' ? '✨ AI-Generated' : '📊 From Data'}
-          </span>
+          Structured Goals
         </div>
       </div>
 
@@ -108,7 +100,6 @@ function AnalysisPanel({ state, dataSource }: { state: Record<string, unknown> |
 
       {goals.length > 0 && (
         <div style={{ marginBottom: 12 }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 6, textTransform: 'uppercase' }}>Structured Goals</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {goals.slice(0, 3).map((goal, i) => {
               const priority = String(goal.priority ?? 'medium').toLowerCase();
@@ -231,7 +222,6 @@ const card: React.CSSProperties = {
 const statusConfig: Record<Task['status'], { color: string; label: string }> = {
   done: { color: '#274133', label: 'Done' },
   in_progress: { color: '#ce9042', label: 'In Progress' },
-  backlog: { color: '#9ca3af', label: 'Backlog' },
   pending: { color: '#6b7280', label: 'Pending' },
 };
 
@@ -484,7 +474,7 @@ function GanttTimeline({ tasks, milestones }: { tasks: Task[]; milestones?: Reco
                     height: '100%',
                     background: sc.color,
                     borderRadius: 4,
-                    opacity: task.status === 'backlog' ? 0.45 : 0.85,
+                    opacity: 0.85,
                     transition: 'width 0.3s',
                     cursor: 'pointer',
                   }}
@@ -636,7 +626,6 @@ function GanttTimeline({ tasks, milestones }: { tasks: Task[]; milestones?: Reco
 const TAB_LIST: { key: Task['status']; label: string; color: string }[] = [
   { key: 'in_progress', label: 'In Progress', color: '#f59e0b' },
   { key: 'pending', label: 'Pending', color: '#6b7280' },
-  { key: 'backlog', label: 'Backlog', color: 'var(--grey-400)' },
   { key: 'done', label: 'Done', color: '#22c55e' },
 ];
 
@@ -1055,83 +1044,6 @@ function NotificationBell({ notifications }: { notifications: RiskAlert[] }) {
   );
 }
 
-/* ─── Risk Details Panel ─── */
-function RiskDetailsPanel({ risks }: { risks: RiskAlert[] }) {
-  if (risks.length === 0) return null;
-
-  const card: React.CSSProperties = {
-    background: '#fafaf8',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-lg)',
-    padding: '16px 18px',
-    marginBottom: 14,
-  };
-
-  const severityColor: Record<string, string> = { high: '#7d2027', medium: '#ce9042', low: '#274133' };
-  const severityBg: Record<string, string> = { high: '#f9e8e9', medium: '#fdf3e3', low: '#e6efeb' };
-  const typeIcon: Record<string, string> = {
-    inactivity: '👤',
-    deadline_risk: '⏰',
-    dependency_blocker: '🔗',
-    ambiguity: '❓',
-    missing_artifact: '📄',
-  };
-
-  const risksByType: Record<string, RiskAlert[]> = {};
-  risks.forEach((r) => {
-    if (!risksByType[r.type]) risksByType[r.type] = [];
-    risksByType[r.type].push(r);
-  });
-
-  return (
-    <div style={card}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <span style={{ fontSize: 18, fontWeight: 400, color: 'var(--grey-900)' }}>⚠️ Active Risks</span>
-        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'var(--grey-150)', color: 'var(--grey-800)' }}>{risks.length} alert{risks.length !== 1 ? 's' : ''}</span>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
-        {risks.map((risk) => (
-          <div
-            key={risk.id}
-            style={{
-              padding: '12px 14px',
-              background: severityBg[risk.severity],
-              border: `1px solid ${severityColor[risk.severity]}`,
-              borderRadius: 8,
-              display: 'flex',
-              gap: 10,
-              alignItems: 'flex-start',
-            }}
-          >
-            <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{typeIcon[risk.type] ?? '⚠️'}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--grey-900)' }}>{risk.message}</p>
-                <span
-                  style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    padding: '1px 6px',
-                    borderRadius: 99,
-                    flexShrink: 0,
-                    background: severityColor[risk.severity],
-                    color: 'white',
-                  }}
-                >
-                  {risk.severity.toUpperCase()}
-                </span>
-              </div>
-              <p style={{ fontSize: 11, color: 'var(--grey-700)', lineHeight: 1.4, marginBottom: 6 }}>{risk.detail}</p>
-              <span style={{ fontSize: 10, color: 'var(--grey-600)' }}>{risk.timestamp}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /* MilestonesTimeline moved into GanttTimeline (dropdown) */
 
 /* ─── Loading skeleton ─── */
@@ -1174,11 +1086,8 @@ export default function ProjectWorkspacePage() {
   const handleTaskStatusChange = async (taskId: string, newStatus: Task['status']) => {
     if (!project) return;
 
-    // Map Task status to BackendTask status (pending → backlog for backend compatibility)
-    const backendStatus = (newStatus === 'pending' ? 'backlog' : newStatus) as 'in_progress' | 'backlog' | 'done';
-
     // Update backend
-    await tasksApi.update(taskId, { status: backendStatus });
+    await tasksApi.update(taskId, { status: newStatus });
 
     // Update local state to reflect change
     setProject((prev) => {
@@ -1435,7 +1344,6 @@ export default function ProjectWorkspacePage() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <AnalysisPanel state={workflowState} dataSource={dataSource} />
-        <RiskDetailsPanel risks={risks} />
         <RubricTracker submissionReport={submissionReport} />
         <GanttTimeline tasks={p.tasks} milestones={milestones} />
         <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr 2fr', gap: 14, alignItems: 'start' }}>

@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useProjects } from '../../contexts/ProjectsContext';
-import type { BackendProject } from '../../api/types';
 
 /* ─── Icons (inline SVGs) ─── */
 const icons = {

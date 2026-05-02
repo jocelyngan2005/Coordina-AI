@@ -129,7 +129,7 @@ function inferPhase(title: string, description: string): Task['phase'] | undefin
  * - percentage_utilized → percentage_utilized
  */
 export function mapTasks(glmTasks: Record<string, unknown>[]): Task[] {
-  const validStatuses = ['pending', 'backlog', 'in_progress', 'done'] as const;
+  const validStatuses = ['pending', 'in_progress', 'done'] as const;
   const validPhases = ['setup', 'design', 'implementation', 'testing', 'documentation'] as const;
   const validPriorities = ['high', 'medium', 'low'] as const;
 

@@ -16,7 +16,7 @@ export interface BackendTask {
   task_id?: string | null;
   title: string;
   description: string | null;
-  status: 'backlog' | 'in_progress' | 'done';
+  status: 'pending' | 'in_progress' | 'done';
   priority: 'low' | 'medium' | 'high';
   assignee_id: string | null;
   estimated_hours: number;
