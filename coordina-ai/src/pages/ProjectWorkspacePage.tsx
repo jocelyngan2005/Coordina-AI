@@ -457,7 +457,7 @@ function AccountabilityAndTasks({ project }: { project: Project }) {
             <p style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', padding: '24px 0' }}>No tasks in this stage</p>
           )}
           {visibleTasks.map((task) => {
-            const m = memberMap[task.assigneeId];
+            const m = task.assigneeId ? memberMap[task.assigneeId] : undefined;
             const conf = task.aiConfidence ?? 0;
             return (
               <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid var(--grey-100)', cursor: 'default' }}>
@@ -717,6 +717,185 @@ function NotificationBell({ notifications }: { notifications: RiskAlert[] }) {
   );
 }
 
+/* ─── Risk Details Panel ─── */
+function RiskDetailsPanel({ risks }: { risks: RiskAlert[] }) {
+  if (risks.length === 0) return null;
+
+  const card: React.CSSProperties = {
+    background: '#fafaf8',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-lg)',
+    padding: '16px 18px',
+    marginBottom: 14,
+  };
+
+  const severityColor: Record<string, string> = { high: '#7d2027', medium: '#ce9042', low: '#274133' };
+  const severityBg: Record<string, string> = { high: '#f9e8e9', medium: '#fdf3e3', low: '#e6efeb' };
+  const typeIcon: Record<string, string> = {
+    inactivity: '👤',
+    deadline_risk: '⏰',
+    dependency_blocker: '🔗',
+    ambiguity: '❓',
+    missing_artifact: '📄',
+  };
+
+  const risksByType: Record<string, RiskAlert[]> = {};
+  risks.forEach((r) => {
+    if (!risksByType[r.type]) risksByType[r.type] = [];
+    risksByType[r.type].push(r);
+  });
+
+  return (
+    <div style={card}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <span style={{ fontSize: 18, fontWeight: 400, color: 'var(--grey-900)' }}>⚠️ Active Risks</span>
+        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'var(--grey-150)', color: 'var(--grey-800)' }}>{risks.length} alert{risks.length !== 1 ? 's' : ''}</span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
+        {risks.map((risk) => (
+          <div
+            key={risk.id}
+            style={{
+              padding: '12px 14px',
+              background: severityBg[risk.severity],
+              border: `1px solid ${severityColor[risk.severity]}`,
+              borderRadius: 8,
+              display: 'flex',
+              gap: 10,
+              alignItems: 'flex-start',
+            }}
+          >
+            <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{typeIcon[risk.type] ?? '⚠️'}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--grey-900)' }}>{risk.message}</p>
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    padding: '1px 6px',
+                    borderRadius: 99,
+                    flexShrink: 0,
+                    background: severityColor[risk.severity],
+                    color: 'white',
+                  }}
+                >
+                  {risk.severity.toUpperCase()}
+                </span>
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--grey-700)', lineHeight: 1.4, marginBottom: 6 }}>{risk.detail}</p>
+              <span style={{ fontSize: 10, color: 'var(--grey-600)' }}>{risk.timestamp}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Milestones Timeline ─── */
+function MilestonesTimeline({ milestones }: { milestones: Record<string, unknown>[] }) {
+  if (!milestones || milestones.length === 0) return null;
+
+  const card: React.CSSProperties = {
+    background: '#fafaf8',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-lg)',
+    padding: '16px 18px',
+    marginBottom: 14,
+  };
+
+  const parseMilestones = () => {
+    return milestones
+      .map((m, i) => ({
+        id: String(m.id ?? m.milestone_id ?? `ms${i}`),
+        title: String(m.title ?? m.name ?? m.milestone ?? `Milestone ${i + 1}`),
+        dueDate: String(m.due_date ?? m.deadline ?? m.date ?? ''),
+        status: String(m.status ?? 'pending') as 'pending' | 'in_progress' | 'completed',
+        description: String(m.description ?? ''),
+      }))
+      .filter((m) => m.dueDate)
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  };
+
+  const parsed = parseMilestones();
+  if (parsed.length === 0) return null;
+
+  const statusConfig: Record<string, { color: string; label: string }> = {
+    pending: { color: '#9ca3af', label: 'Pending' },
+    in_progress: { color: '#ce9042', label: 'In Progress' },
+    completed: { color: '#274133', label: 'Completed' },
+  };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return (
+    <div style={card}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <span style={{ fontSize: 18, fontWeight: 400, color: 'var(--grey-900)' }}>🎯 Milestones</span>
+        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'var(--grey-150)', color: 'var(--grey-800)' }}>
+          {parsed.filter((m) => m.status === 'completed').length}/{parsed.length} complete
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {parsed.map((milestone) => {
+          const dueDate = new Date(milestone.dueDate);
+          const isOverdue = dueDate < today && milestone.status !== 'completed';
+          const daysUntil = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          const sc = statusConfig[milestone.status];
+
+          return (
+            <div
+              key={milestone.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '12px 14px',
+                background: 'var(--white)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                borderLeft: `4px solid ${sc.color}`,
+              }}
+            >
+              <div style={{ width: 6, height: 6, borderRadius: 3, background: sc.color, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--grey-900)', marginBottom: 2 }}>{milestone.title}</p>
+                {milestone.description && (
+                  <p style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4, lineHeight: 1.3 }}>{milestone.description}</p>
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-3)' }}>📅 {milestone.dueDate}</span>
+                  {isOverdue && <span style={{ fontSize: 10, color: '#dc2626', fontWeight: 600 }}>🔴 OVERDUE</span>}
+                  {daysUntil > 0 && daysUntil <= 7 && !isOverdue && (
+                    <span style={{ fontSize: 10, color: '#ce9042', fontWeight: 600 }}>⏰ {daysUntil}d left</span>
+                  )}
+                </div>
+              </div>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: '3px 9px',
+                  borderRadius: 4,
+                  background: isOverdue ? '#fee2e2' : milestone.status === 'completed' ? '#dcfce7' : '#fef3c7',
+                  color: isOverdue ? '#991b1b' : milestone.status === 'completed' ? '#166534' : '#92400e',
+                  flexShrink: 0,
+                }}
+              >
+                {sc.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ─── Loading skeleton ─── */
 function WorkspaceSkeleton() {
   const shimmer: React.CSSProperties = { background: 'var(--grey-150)', borderRadius: 6, animation: 'pulse 1.5s ease-in-out infinite' };
@@ -742,6 +921,7 @@ export default function ProjectWorkspacePage() {
   const [rubric, setRubric] = useState<RubricItem[]>(MOCK_RUBRIC);
   const [risks, setRisks] = useState<RiskAlert[]>(MOCK_RISKS);
   const [submissionChecklist, setSubmissionChecklist] = useState<ChecklistItem[]>([]);
+  const [milestones, setMilestones] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(!isMockId);
   const [apiAvailable, setApiAvailable] = useState(true);
   const [workflowState, setWorkflowState] = useState<Record<string, unknown> | null>(null);
@@ -779,7 +959,7 @@ export default function ProjectWorkspacePage() {
 
         if (workflowState) {
           // Store workflow state as-is (already typed as WorkflowState)
-          setWorkflowState(workflowState);
+          setWorkflowState(workflowState as unknown as Record<string, unknown>);
           setDataSource('glm');
           
           // Use GLM planning tasks if available, fall back to DB tasks
@@ -831,6 +1011,14 @@ export default function ProjectWorkspacePage() {
           else {
             const fallback = extractRisks(riskResult);
             if (fallback) setRisks(fallback);
+          }
+
+          // Milestones extraction
+          const rawMilestones = Array.isArray(workflowState.milestones)
+            ? (workflowState.milestones as Record<string, unknown>[])
+            : [];
+          if (rawMilestones.length > 0) {
+            setMilestones(rawMilestones);
           }
         } else {
           setDataSource('mock');
@@ -890,6 +1078,8 @@ export default function ProjectWorkspacePage() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <AnalysisPanel state={workflowState} dataSource={dataSource} />
+        <RiskDetailsPanel risks={risks} />
+        <MilestonesTimeline milestones={milestones} />
         <RubricTracker rubric={rubric} />
         <GanttTimeline tasks={p.tasks} />
         <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr 2fr', gap: 14, alignItems: 'start' }}>
