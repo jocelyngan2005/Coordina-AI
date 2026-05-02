@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import PageLayout from '../components/layout/PageLayout';
 import { MOCK_PROJECT, MOCK_RISKS, MOCK_RUBRIC } from '../data/mockData';
@@ -13,12 +13,17 @@ import { mapProject, mapTasks, mapTeamMembers, extractRubric, extractRisks, mapR
 function AnalysisPanel({ state, dataSource }: { state: Record<string, unknown> | null; dataSource: 'glm' | 'mock' }) {
   if (!state) return null;
 
+  const deliverables = Array.isArray(state.deliverables) ? (state.deliverables as Record<string, unknown>[]) : [];
   const goals = Array.isArray(state.structured_goals) ? (state.structured_goals as Record<string, unknown>[]) : [];
   const ambiguities = Array.isArray(state.ambiguities) ? (state.ambiguities as Record<string, unknown>[]) : [];
   const confidence = Number(state.confidence_score ?? 0);
   const priorities = Array.isArray(state.grading_priorities) ? (state.grading_priorities as Record<string, unknown>[]) : [];
+  const implicit = Array.isArray(state.implicit_expectations) ? (state.implicit_expectations as string[]) : [];
+  const escalation = Boolean(state.escalation_required);
+  const escalationReason = String(state.escalation_reason ?? '');
+  const documentType = String(state.document_type ?? 'unknown').replace(/_/g, ' ');
 
-  if (goals.length === 0 && ambiguities.length === 0 && priorities.length === 0) {
+  if (goals.length === 0 && ambiguities.length === 0 && priorities.length === 0 && deliverables.length === 0) {
     return null;
   }
 
@@ -30,15 +35,27 @@ function AnalysisPanel({ state, dataSource }: { state: Record<string, unknown> |
     marginBottom: 14,
   };
 
+  const getPriorityColor = (priority: unknown) => {
+    const p = String(priority ?? 'medium').toLowerCase();
+    if (p === 'high') return '#ef4444';
+    if (p === 'low') return '#22c55e';
+    return '#f59e0b'; // medium
+  };
+
   return (
     <div style={card}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <div style={{ fontSize: 18, fontWeight: 400, color: 'var(--grey-900)' }}>
           📋 Analysis Results
         </div>
-        <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-3)', background: 'var(--white)', padding: '3px 8px', borderRadius: 4 }}>
-          {dataSource === 'glm' ? '✨ AI-Generated' : '📊 From Data'}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 9, fontWeight: 500, color: 'var(--text-3)', background: 'var(--white)', padding: '2px 6px', borderRadius: 3, textTransform: 'capitalize' }}>
+            {documentType}
+          </span>
+          <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-3)', background: 'var(--white)', padding: '3px 8px', borderRadius: 4 }}>
+            {dataSource === 'glm' ? '✨ AI-Generated' : '📊 From Data'}
+          </span>
+        </div>
       </div>
 
       {confidence > 0 && (
@@ -51,15 +68,65 @@ function AnalysisPanel({ state, dataSource }: { state: Record<string, unknown> |
         </div>
       )}
 
+      {escalation && (
+        <div style={{ marginBottom: 12, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6 }}>
+          <p style={{ fontSize: 10, fontWeight: 600, color: '#991b1b', marginBottom: 2 }}>🚨 Escalation Required</p>
+          <p style={{ fontSize: 9, color: '#b91c1c' }}>{escalationReason}</p>
+        </div>
+      )}
+
+      {deliverables.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 6, textTransform: 'uppercase' }}>Key Deliverables</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {deliverables.slice(0, 3).map((d, i) => {
+              const weight = Number(d.weight_pct ?? 0);
+              return (
+                <div key={i} style={{ padding: '8px 12px', background: 'var(--white)', borderRadius: 6, border: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 }}>
+                    <span style={{ fontWeight: 500, color: 'var(--grey-900)', fontSize: 11 }}>
+                      {String(d.title ?? d.id ?? `Deliverable ${i + 1}`)}
+                    </span>
+                    {weight > 0 && (
+                      <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)', background: 'var(--grey-100)', padding: '2px 6px', borderRadius: 3 }}>
+                        {weight}%
+                      </span>
+                    )}
+                  </div>
+                  {d.description ? (
+                    <p style={{ fontSize: 10, color: 'var(--text-3)', lineHeight: 1.3 }}>
+                      {String(d.description) as ReactNode}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
+            {deliverables.length > 3 && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>+{deliverables.length - 3} more</span>}
+          </div>
+        </div>
+      )}
+
       {goals.length > 0 && (
         <div style={{ marginBottom: 12 }}>
           <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 6, textTransform: 'uppercase' }}>Structured Goals</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {goals.slice(0, 3).map((goal, i) => (
-              <div key={i} style={{ padding: '6px 10px', background: 'var(--white)', borderRadius: 6, border: '1px solid var(--border)', fontSize: 11 }}>
-                <span style={{ fontWeight: 500, color: 'var(--grey-900)' }}>{String(goal.title ?? goal.goal ?? `Goal ${i + 1}`)}</span>
-              </div>
-            ))}
+            {goals.slice(0, 3).map((goal, i) => {
+              const priority = String(goal.priority ?? 'medium').toLowerCase();
+              const color = getPriorityColor(priority);
+              return (
+                <div key={i} style={{ padding: '8px 12px', background: 'var(--white)', borderRadius: 6, border: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <div style={{ width: 4, height: 4, borderRadius: '50%', background: color, marginTop: 4, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 500, color: 'var(--grey-900)', fontSize: 11, marginBottom: 2 }}>
+                      {String(goal.statement ?? goal.title ?? `Goal ${i + 1}`)}
+                    </div>
+                    <span style={{ fontSize: 9, fontWeight: 500, color: 'var(--text-3)', textTransform: 'uppercase' }}>
+                      {priority} priority
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
             {goals.length > 3 && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>+{goals.length - 3} more</span>}
           </div>
         </div>
@@ -67,27 +134,67 @@ function AnalysisPanel({ state, dataSource }: { state: Record<string, unknown> |
 
       {priorities.length > 0 && (
         <div style={{ marginBottom: 12 }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 6, textTransform: 'uppercase' }}>Grading Priorities</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {priorities.slice(0, 2).map((p, i) => (
-              <div key={i} style={{ fontSize: 10, color: 'var(--grey-700)' }}>
-                • {String(p.name ?? p.priority ?? `Priority ${i + 1}`)}
-              </div>
+          <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 6, textTransform: 'uppercase' }}>Grading Criteria</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {priorities.slice(0, 4).map((p, i) => {
+              const weight = Number(p.weight_pct ?? 0);
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontWeight: 500, color: 'var(--grey-900)', marginBottom: 1 }}>
+                      {String(p.criterion ?? p.name ?? p.priority ?? `Criterion ${i + 1}`)}
+                    </p>
+                    {p.notes ? (
+                      <p style={{ fontSize: 9, color: 'var(--text-3)' }}>
+                        {String(p.notes) as ReactNode}
+                      </p>
+                    ) : null}
+                  </div>
+                  {weight > 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--grey-900)', background: 'var(--grey-100)', padding: '2px 8px', borderRadius: 3, flexShrink: 0 }}>
+                      {weight}%
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+            {priorities.length > 4 && <span style={{ fontSize: 9, color: 'var(--text-3)' }}>+{priorities.length - 4} more</span>}
+          </div>
+        </div>
+      )}
+
+      {implicit.length > 0 && (
+        <div style={{ marginBottom: 12, padding: '8px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6 }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: '#166534', marginBottom: 4 }}>💡 Implicit Expectations</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {implicit.slice(0, 3).map((exp, i) => (
+              <p key={i} style={{ fontSize: 10, color: '#15803d' }}>
+                • {exp}
+              </p>
             ))}
-            {priorities.length > 2 && <span style={{ fontSize: 9, color: 'var(--text-3)' }}>+{priorities.length - 2} more</span>}
+            {implicit.length > 3 && <p style={{ fontSize: 9, color: '#16a34a' }}>+{implicit.length - 3} more</p>}
           </div>
         </div>
       )}
 
       {ambiguities.length > 0 && (
         <div style={{ padding: '8px 12px', background: '#fdf3e3', border: '1px solid #fde68a', borderRadius: 6 }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: '#92400e', marginBottom: 4 }}>⚠️ Ambiguities Detected</p>
-          {ambiguities.slice(0, 2).map((amb, i) => (
-            <p key={i} style={{ fontSize: 10, color: '#b45309', marginBottom: i < ambiguities.length - 1 ? 4 : 0 }}>
-              • {String(amb.description ?? amb.issue ?? amb.ambiguity ?? `Issue ${i + 1}`)}
-            </p>
-          ))}
-          {ambiguities.length > 2 && <p style={{ fontSize: 9, color: '#b45309' }}>+{ambiguities.length - 2} more</p>}
+          <p style={{ fontSize: 11, fontWeight: 600, color: '#92400e', marginBottom: 4 }}>⚠️ Ambiguities & Clarifications</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {ambiguities.slice(0, 2).map((amb, i) => (
+              <div key={i}>
+                <p style={{ fontSize: 10, color: '#b45309', fontWeight: 500, marginBottom: 2 }}>
+                  • {String(amb.issue ?? amb.description ?? amb.ambiguity ?? `Issue ${i + 1}`)}
+                </p>
+                {amb.suggested_clarification ? (
+                  <p style={{ fontSize: 9, color: '#92400e', marginLeft: 16, fontStyle: 'italic' }}>
+                    💬 {String(amb.suggested_clarification) as ReactNode}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+            {ambiguities.length > 2 && <p style={{ fontSize: 9, color: '#b45309' }}>+{ambiguities.length - 2} more</p>}
+          </div>
         </div>
       )}
     </div>
