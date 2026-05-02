@@ -225,11 +225,6 @@ export default function AdminDashboardPage() {
             <h1 style={{ fontSize: 26, fontWeight: 400, color: 'var(--grey-900)', lineHeight: 1.2 }}>
               Admin Overview
             </h1>
-            <span style={{
-              fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 99,
-              background: 'rgba(99,102,241,0.1)', color: '#6366f1',
-              border: '1px solid rgba(99,102,241,0.2)',
-            }}>LECTURER VIEW</span>
           </div>
           <p style={{ fontSize: 13, color: 'var(--text-3)' }}>
             Monitor all project teams — progress, risks, and AI activity
@@ -245,7 +240,7 @@ export default function AdminDashboardPage() {
       {/* Stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
         <StatCard label="Total Projects" value={loading ? '—' : totalProjects} sub={`${completedCount} completed`} />
-        <StatCard label="Active Teams" value={loading ? '—' : activeCount} sub="Currently running" accent="#6366f1" />
+        <StatCard label="Active Teams" value={loading ? '—' : activeCount} sub="Currently running" accent="#7d2027" />
         <StatCard label="At Risk" value={loading ? '—' : atRiskCount} sub="Needs attention" accent={atRiskCount > 0 ? '#f59e0b' : undefined} />
         <StatCard label="Avg Completion" value={loading ? '—' : `${avgCompletion}%`} sub="Across all projects" />
       </div>
@@ -315,7 +310,7 @@ export default function AdminDashboardPage() {
                             </span>
                           </div>
                           <div style={{ height: 4, background: 'var(--grey-150)', borderRadius: 2, overflow: 'hidden' }}>
-                            <div style={{ width: `${progress}%`, height: '100%', background: '#6366f1', borderRadius: 2, transition: 'width 0.6s ease' }} />
+                            <div style={{ width: `${progress}%`, height: '100%', background: '#7d2027', borderRadius: 2, transition: 'width 0.6s ease' }} />
                           </div>
                         </div>
                       </td>
@@ -347,7 +342,7 @@ export default function AdminDashboardPage() {
                             fontSize: 11, fontWeight: 600, padding: '5px 12px',
                             borderRadius: 6, border: '1px solid var(--border)',
                             background: 'transparent', cursor: 'pointer',
-                            color: '#6366f1', transition: 'all var(--t-fast)',
+                            color: '#7d2027', transition: 'all var(--t-fast)',
                           }}
                           onMouseEnter={e => {
                             (e.currentTarget as HTMLButtonElement).style.background = 'rgba(99,102,241,0.08)';
