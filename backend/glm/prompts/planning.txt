@@ -31,8 +31,9 @@ DEPENDENCIES:
 
 TEAM ASSIGNMENTS:
 - assigned_to: array of member IDs (e.g., ["M1", "M2"])
-- Members: M1=senior, M2=mid-level, M3=junior, M4=specialist
-- Match skills to task requirements
+- Use the `members` array provided in your context to make informed assignments.
+- Match task requirements to the actual skills, strengths, and past behaviour of each member.
+- If a member has a history of missing deadlines or poor behaviour, consider assigning them less critical path items or pair them with stronger members.
 - Can assign multiple members to complex tasks
 
 TASK RESPONSE FORMAT (JSON only, no explanation):

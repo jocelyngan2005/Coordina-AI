@@ -199,3 +199,26 @@ ol {
 .spinning {
   animation: spin 1s linear infinite;
 }
+
+@keyframes orbFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(20px, -30px) scale(1.05); }
+  66% { transform: translate(-15px, 20px) scale(0.96); }
+}
+
+@keyframes fadeSlideDown {
+  from { opacity: 0; transform: translateY(-14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Admin accent colour tokens */
+:root {
+  --admin-accent: #6366f1;
+  --admin-accent-light: rgba(99, 102, 241, 0.12);
+  --admin-accent-border: rgba(99, 102, 241, 0.25);
+}

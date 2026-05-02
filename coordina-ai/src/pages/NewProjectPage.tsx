@@ -6,7 +6,7 @@ import { teamsApi } from '../api/teams';
 import { documentsApi } from '../api/documents';
 import { workflowApi } from '../api/workflow';
 
-type DocType = 'brief' | 'rubric' | 'meeting_transcript' | 'chat_logs';
+type DocType = 'brief' | 'rubric' | 'meeting_transcript' | 'chat_logs' | 'team_profile';
 
 interface UploadedFile {
   name: string;
@@ -21,6 +21,7 @@ const docTypeLabels: Record<DocType, string> = {
   rubric: 'Rubric',
   meeting_transcript: 'Meeting Transcript',
   chat_logs: 'Chat Logs',
+  team_profile: 'Team Profile',
 };
 
 const steps = ['Upload Documents', 'Team & Timeline', 'AI Ingestion'];
@@ -39,7 +40,6 @@ export default function NewProjectPage() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [projectName, setProjectName] = useState('');
   const [deadline, setDeadline] = useState('');
-  const [members, setMembers] = useState('');
   const [ingesting, setIngesting] = useState(false);
   const [ingestStep, setIngestStep] = useState(0);
   const [ingestError, setIngestError] = useState<string | null>(null);
@@ -97,35 +97,8 @@ export default function NewProjectPage() {
         deadline_date: deadline || undefined,
       });
 
-      // ── Step 1: Add team members ──────────────────────────────────────────
+      // ── Step 1: Upload documents ──────────────────────────────────────────
       setIngestStep(1);
-      const parsedMembers = members
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean)
-        .map((line) => {
-          const [name, ...rest] = line.split(',');
-          return { name: (name ?? '').trim(), role: rest.join(',').trim() };
-        })
-        .filter((m) => m.name);
-
-      const memberResults = await Promise.allSettled(
-        parsedMembers.map((m) =>
-          teamsApi.addMember({
-            project_id: project.id,
-            name: m.name,
-            skills: m.role ? [m.role] : [],
-          }),
-        ),
-      );
-
-      const membersFailed = memberResults.some((r) => r.status === 'rejected');
-      if (membersFailed) {
-        console.warn('Some team members failed to add, continuing...');
-      }
-
-      // ── Step 2: Upload documents ──────────────────────────────────────────
-      setIngestStep(2);
       const realFiles = files.filter((f) => f.file !== undefined);
 
       if (realFiles.length === 0) {
@@ -159,11 +132,8 @@ export default function NewProjectPage() {
         document_type: 'brief',
         deadline_date: deadline || new Date().toISOString().slice(0, 10),
         project_name: projectName || 'Untitled Project',
-        team_size: String(parsedMembers.length),
-        team_members: JSON.stringify(parsedMembers.map((m) => ({
-          name: m.name,
-          skills: m.role ? [m.role] : [],
-        }))),
+        team_size: '0',
+        team_members: '[]',
       });
 
       const streamUrl = `${BASE_URL}/workflow/${project.id}/stream-pipeline?${params.toString()}`;
@@ -383,7 +353,7 @@ export default function NewProjectPage() {
                       <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
                     </svg>
                     <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--grey-700)', marginBottom: 4 }}>Drop files here or click to upload</p>
-                    <p style={{ fontSize: 12, color: 'var(--text-3)' }}>Briefs, rubrics, transcripts, chat logs</p>
+                    <p style={{ fontSize: 12, color: 'var(--text-3)' }}>Briefs, rubrics, team profiles, transcripts</p>
                     <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
                       <span style={{ color: 'var(--grey-600)', fontWeight: 500 }}>PDF files only</span> — text will be extracted automatically via OCR
                     </p>
@@ -446,18 +416,6 @@ export default function NewProjectPage() {
                       <div>
                         <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--grey-700)', display: 'block', marginBottom: 6 }}>Submission Deadline</label>
                         <input style={inputStyle} type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--grey-700)', display: 'block', marginBottom: 6 }}>
-                          Team Members <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(one per line: Name, Role)</span>
-                        </label>
-                        <textarea
-                          rows={5}
-                          style={{ ...inputStyle, resize: 'vertical' }}
-                          placeholder={'Alex Chen, Team Lead\nPriya Sharma, AI Engineer\nJordan Lee, Frontend Dev'}
-                          value={members}
-                          onChange={(e) => setMembers(e.target.value)}
-                        />
                       </div>
                     </div>
                   </div>
