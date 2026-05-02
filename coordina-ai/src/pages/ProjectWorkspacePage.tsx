@@ -1312,6 +1312,69 @@ export default function ProjectWorkspacePage() {
     return () => { cancelled = true; };
   }, [projectId, isMockId]);
 
+  // ── Continuous Risk Monitoring & Event Stream ──
+  useEffect(() => {
+    if (isMockId || !projectId) return;
+
+    let ws: WebSocket;
+    let pingInterval: ReturnType<typeof setInterval>;
+
+    try {
+      ws = new WebSocket(`ws://localhost:8000/ws/projects/${projectId}`);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'workflow_event') {
+            const evType = data.event_type;
+            if (evType === 'risk_check_complete' || evType === 'inactivity_detected' || evType === 'recovery_triggered') {
+              const payload = data.payload || {};
+              const executedAt = data.timestamp || new Date().toISOString();
+              const mappedRisks = mapRisks(payload, executedAt);
+              if (mappedRisks.length > 0) setRisks(mappedRisks);
+              else {
+                const fallback = extractRisks(payload);
+                if (fallback) setRisks(fallback);
+              }
+            }
+          }
+        } catch (e) {
+          console.error('WS parse error:', e);
+        }
+      };
+
+      pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        }
+      }, 30000);
+    } catch (e) {
+      console.warn('Could not connect to workflow stream', e);
+    }
+
+    // Trigger background risk check every 30s
+    const riskInterval = setInterval(async () => {
+      try {
+        const response = await workflowApi.runRiskCheck(projectId);
+        const riskResult = (response as { result?: Record<string, unknown> })?.result ?? (response as Record<string, unknown>);
+        const executedAt = String(riskResult?.executed_at ?? new Date().toISOString());
+        const mappedRisks = mapRisks(riskResult, executedAt);
+        if (mappedRisks.length > 0) setRisks(mappedRisks);
+        else {
+          const fallback = extractRisks(riskResult);
+          if (fallback) setRisks(fallback);
+        }
+      } catch (err) {
+        console.error('Background risk check failed', err);
+      }
+    }, 30000);
+
+    return () => {
+      clearInterval(riskInterval);
+      if (pingInterval) clearInterval(pingInterval);
+      if (ws) ws.close();
+    };
+  }, [projectId, isMockId]);
+
   if (loading) return <WorkspaceSkeleton />;
   if (!project) return <PageLayout><p style={{ fontSize: 14, color: 'var(--text-3)' }}>Project not found or failed to load.</p></PageLayout>;
 
