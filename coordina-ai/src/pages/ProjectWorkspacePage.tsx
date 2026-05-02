@@ -412,8 +412,9 @@ function RubricTracker({ submissionReport }: { submissionReport?: Record<string,
 }
 
 /* ─── Section B: Gantt Timeline ─── */
-function GanttTimeline({ tasks }: { tasks: Task[] }) {
+function GanttTimeline({ tasks, milestones }: { tasks: Task[]; milestones?: Record<string, unknown>[] }) {
   const [tooltip, setTooltip] = useState<{ task: Task; x: number; y: number } | null>(null);
+  const [showMilestones, setShowMilestones] = useState(false);
 
   const parseDate = (d: string) => new Date(d).getTime();
   const validTasks = tasks.filter((t) => t.startDate && t.dueDate);
@@ -447,7 +448,9 @@ function GanttTimeline({ tasks }: { tasks: Task[] }) {
 
   return (
     <div style={card}>
-      <SectionTitle>Dynamic Timeline</SectionTitle>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <SectionTitle>Dynamic Timeline</SectionTitle>
+      </div>
 
       <div style={{ position: 'relative', height: 18, marginBottom: 4, marginLeft: 140 }}>
         {axisLabels.map((ax) => (
@@ -511,6 +514,104 @@ function GanttTimeline({ tasks }: { tasks: Task[] }) {
           <span style={{ fontSize: 10, color: 'var(--text-3)' }}>Blocking</span>
         </div>
       </div>
+
+      <div style={{ display: 'flex', gap: 14, marginTop: 16 }}>
+        {milestones && milestones.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => setShowMilestones((s) => !s)}
+              title="Show milestones"
+              style={{ background: 'transparent', border: '1px solid var(--border)', padding: '6px 10px', borderRadius: 6, cursor: 'pointer' }}
+            >
+              {showMilestones ? 'Hide Milestones' : `Milestones (${milestones.length})`}
+            </button>
+          </div>
+      )}
+      </div>
+
+      {showMilestones && milestones && milestones.length > 0 && (() => {
+        const parseMilestones = () => {
+          return (milestones ?? [])
+            .map((m, i) => ({
+              id: String(m.id ?? m.milestone_id ?? `ms${i}`),
+              title: String(m.title ?? m.name ?? m.milestone ?? `Milestone ${i + 1}`),
+              dueDate: String(m.due_date ?? m.deadline ?? m.date ?? ''),
+              status: String(m.status ?? 'pending') as 'pending' | 'in_progress' | 'completed',
+              description: String(m.description ?? ''),
+            }))
+            .filter((m) => m.dueDate)
+            .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+        };
+
+        const parsed = parseMilestones();
+        if (parsed.length === 0) return null;
+
+        const statusCfg: Record<string, { color: string; label: string }> = {
+          pending: { color: '#9ca3af', label: 'Pending' },
+          in_progress: { color: '#ce9042', label: 'In Progress' },
+          completed: { color: '#274133', label: 'Completed' },
+        };
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        return (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {parsed.map((milestone) => {
+                const dueDate = new Date(milestone.dueDate);
+                const isOverdue = dueDate < today && milestone.status !== 'completed';
+                const daysUntil = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                const sc = statusCfg[milestone.status];
+
+                return (
+                  <div
+                    key={milestone.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '12px 14px',
+                      background: 'var(--white)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      borderLeft: `4px solid ${sc.color}`,
+                    }}
+                  >
+                    <div style={{ width: 6, height: 6, borderRadius: 3, background: sc.color, flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--grey-900)', marginBottom: 2 }}>{milestone.title}</p>
+                      {milestone.description && (
+                        <p style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4, lineHeight: 1.3 }}>{milestone.description}</p>
+                      )}
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <span style={{ fontSize: 10, color: 'var(--text-3)' }}>📅 {milestone.dueDate}</span>
+                        {isOverdue && <span style={{ fontSize: 10, color: '#dc2626', fontWeight: 600 }}>🔴 OVERDUE</span>}
+                        {daysUntil > 0 && daysUntil <= 7 && !isOverdue && (
+                          <span style={{ fontSize: 10, color: '#ce9042', fontWeight: 600 }}>⏰ {daysUntil}d left</span>
+                        )}
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        padding: '3px 9px',
+                        borderRadius: 4,
+                        background: isOverdue ? '#fee2e2' : milestone.status === 'completed' ? '#dcfce7' : '#fef3c7',
+                        color: isOverdue ? '#991b1b' : milestone.status === 'completed' ? '#166534' : '#92400e',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {sc.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {tooltip && (
         <div style={{
@@ -1031,107 +1132,7 @@ function RiskDetailsPanel({ risks }: { risks: RiskAlert[] }) {
   );
 }
 
-/* ─── Milestones Timeline ─── */
-function MilestonesTimeline({ milestones }: { milestones: Record<string, unknown>[] }) {
-  if (!milestones || milestones.length === 0) return null;
-
-  const card: React.CSSProperties = {
-    background: '#fafaf8',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-lg)',
-    padding: '16px 18px',
-    marginBottom: 14,
-  };
-
-  const parseMilestones = () => {
-    return milestones
-      .map((m, i) => ({
-        id: String(m.id ?? m.milestone_id ?? `ms${i}`),
-        title: String(m.title ?? m.name ?? m.milestone ?? `Milestone ${i + 1}`),
-        dueDate: String(m.due_date ?? m.deadline ?? m.date ?? ''),
-        status: String(m.status ?? 'pending') as 'pending' | 'in_progress' | 'completed',
-        description: String(m.description ?? ''),
-      }))
-      .filter((m) => m.dueDate)
-      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  };
-
-  const parsed = parseMilestones();
-  if (parsed.length === 0) return null;
-
-  const statusConfig: Record<string, { color: string; label: string }> = {
-    pending: { color: '#9ca3af', label: 'Pending' },
-    in_progress: { color: '#ce9042', label: 'In Progress' },
-    completed: { color: '#274133', label: 'Completed' },
-  };
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  return (
-    <div style={card}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <span style={{ fontSize: 18, fontWeight: 400, color: 'var(--grey-900)' }}>🎯 Milestones</span>
-        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'var(--grey-150)', color: 'var(--grey-800)' }}>
-          {parsed.filter((m) => m.status === 'completed').length}/{parsed.length} complete
-        </span>
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {parsed.map((milestone) => {
-          const dueDate = new Date(milestone.dueDate);
-          const isOverdue = dueDate < today && milestone.status !== 'completed';
-          const daysUntil = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-          const sc = statusConfig[milestone.status];
-
-          return (
-            <div
-              key={milestone.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                padding: '12px 14px',
-                background: 'var(--white)',
-                border: '1px solid var(--border)',
-                borderRadius: 8,
-                borderLeft: `4px solid ${sc.color}`,
-              }}
-            >
-              <div style={{ width: 6, height: 6, borderRadius: 3, background: sc.color, flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--grey-900)', marginBottom: 2 }}>{milestone.title}</p>
-                {milestone.description && (
-                  <p style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4, lineHeight: 1.3 }}>{milestone.description}</p>
-                )}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <span style={{ fontSize: 10, color: 'var(--text-3)' }}>📅 {milestone.dueDate}</span>
-                  {isOverdue && <span style={{ fontSize: 10, color: '#dc2626', fontWeight: 600 }}>🔴 OVERDUE</span>}
-                  {daysUntil > 0 && daysUntil <= 7 && !isOverdue && (
-                    <span style={{ fontSize: 10, color: '#ce9042', fontWeight: 600 }}>⏰ {daysUntil}d left</span>
-                  )}
-                </div>
-              </div>
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 600,
-                  padding: '3px 9px',
-                  borderRadius: 4,
-                  background: isOverdue ? '#fee2e2' : milestone.status === 'completed' ? '#dcfce7' : '#fef3c7',
-                  color: isOverdue ? '#991b1b' : milestone.status === 'completed' ? '#166534' : '#92400e',
-                  flexShrink: 0,
-                }}
-              >
-                {sc.label}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+/* MilestonesTimeline moved into GanttTimeline (dropdown) */
 
 /* ─── Loading skeleton ─── */
 function WorkspaceSkeleton() {
@@ -1435,9 +1436,8 @@ export default function ProjectWorkspacePage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <AnalysisPanel state={workflowState} dataSource={dataSource} />
         <RiskDetailsPanel risks={risks} />
-        <MilestonesTimeline milestones={milestones} />
         <RubricTracker submissionReport={submissionReport} />
-        <GanttTimeline tasks={p.tasks} />
+        <GanttTimeline tasks={p.tasks} milestones={milestones} />
         <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr 2fr', gap: 14, alignItems: 'start' }}>
           <AccountabilityAndTasks project={p} />
           <MyTasksCard tasks={p.tasks} members={p.teamMembers} onTaskStatusChange={handleTaskStatusChange} />
