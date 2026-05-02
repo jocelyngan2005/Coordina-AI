@@ -8,9 +8,11 @@ import { tasksApi } from '../api/tasks';
 import { teamsApi } from '../api/teams';
 import { workflowApi, analyticsApi } from '../api/workflow';
 import { mapProject, mapTasks, mapTeamMembers, extractRubric, extractRisks, mapRubric, mapRisks } from '../api/mappers';
+import SubmissionUploadDialog from './SubmissionUploadPage';
+import React from 'react';
 
 /* ─── Analysis Results Panel ─── */
-function AnalysisPanel({ state, dataSource }: { state: Record<string, unknown> | null; dataSource: 'glm' | 'mock' }) {
+function AnalysisPanel({ state }: { state: Record<string, unknown> | null; dataSource: 'glm' | 'mock' }) {
   if (!state) return null;
 
   const deliverables = Array.isArray(state.deliverables) ? (state.deliverables as Record<string, unknown>[]) : [];
@@ -21,7 +23,6 @@ function AnalysisPanel({ state, dataSource }: { state: Record<string, unknown> |
   const implicit = Array.isArray(state.implicit_expectations) ? (state.implicit_expectations as string[]) : [];
   const escalation = Boolean(state.escalation_required);
   const escalationReason = String(state.escalation_reason ?? '');
-  const documentType = String(state.document_type ?? 'unknown').replace(/_/g, ' ');
 
   if (goals.length === 0 && ambiguities.length === 0 && priorities.length === 0 && deliverables.length === 0) {
     return null;
@@ -772,9 +773,16 @@ function AccountabilityAndTasks({ project }: { project: Project }) {
 }
 
 /* ─── Section D: Submission Checklist ─── */
-function ArtifactsCard({ checklist }: { checklist: ChecklistItem[] }) {
+function ArtifactsCard({ checklist, onUploadClick }: { checklist: ChecklistItem[]; onUploadClick?: (itemName: string) => void }) {
   const items = checklist;
   const completeCount = items.filter((c) => c.status === 'complete').length;
+  const [uploadedItems, setUploadedItems] = React.useState<Set<string>>(new Set());
+
+  const handleUploadClick = (itemName: string) => {
+    setUploadedItems(prev => new Set(prev).add(itemName));
+    onUploadClick?.(itemName);
+  };
+
   return (
     <div style={{ ...card, padding: 0, display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '16px 18px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -788,6 +796,8 @@ function ArtifactsCard({ checklist }: { checklist: ChecklistItem[] }) {
           const isComplete = c.status === 'complete';
           const isInProgress = c.status === 'in_progress';
           const color = isComplete ? '#274133' : isInProgress ? '#ce9042' : '#9ca3af';
+          const isUploaded = uploadedItems.has(c.item);
+
           return (
             <div key={c.item} style={{ display: 'flex', gap: 12, padding: '10px 14px', alignItems: 'center', borderBottom: i < items.length - 1 ? '1px solid var(--grey-100)' : 'none' }}>
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0 }}>
@@ -801,6 +811,49 @@ function ArtifactsCard({ checklist }: { checklist: ChecklistItem[] }) {
                   <p style={{ fontSize: 10, color: 'var(--text-3)' }}>{c.priority} priority</p>
                 )}
               </div>
+              {onUploadClick && (
+                <button
+                  onClick={() => handleUploadClick(c.item)}
+                  title={isUploaded ? 'Reupload submission' : 'Upload submission'}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: isUploaded ? 'var(--white)' : 'var(--grey-900)',
+                    border: isUploaded ? '1px solid var(--border)' : 'none',
+                    cursor: 'pointer',
+                    color: isUploaded ? 'var(--grey-900)' : 'var(--white)',
+                    padding: '6px 10px',
+                    borderRadius: 5,
+                    transition: 'all 0.15s',
+                    flexShrink: 0,
+                    gap: 5,
+                    fontSize: 11,
+                    fontWeight: 500,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (isUploaded) {
+                      (e.currentTarget as HTMLButtonElement).style.background = '#f5f5f5';
+                    } else {
+                      (e.currentTarget as HTMLButtonElement).style.background = '#1a1a1a';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (isUploaded) {
+                      (e.currentTarget as HTMLButtonElement).style.background = 'var(--white)';
+                    } else {
+                      (e.currentTarget as HTMLButtonElement).style.background = 'var(--grey-900)';
+                    }
+                  }}
+                >
+                  {/* Google Material Icon: attach_file_add */}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="12" y1="13" x2="12" y2="19" />
+                    <line x1="9" y1="16" x2="15" y2="16" />
+                  </svg>
+                  {isUploaded ? 'Reupload' : 'Upload'}
+                </button>
+              )}
             </div>
           );
         })}
@@ -1081,6 +1134,7 @@ export default function ProjectWorkspacePage() {
   const [dataSource, setDataSource] = useState<'glm' | 'mock'>('mock');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [uploadDialogItem, setUploadDialogItem] = useState<string | null>(null);
 
   // Handle task status changes and update backend + local state
   const handleTaskStatusChange = async (taskId: string, newStatus: Task['status']) => {
@@ -1349,10 +1403,34 @@ export default function ProjectWorkspacePage() {
         <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr 2fr', gap: 14, alignItems: 'start' }}>
           <AccountabilityAndTasks project={p} />
           <MyTasksCard tasks={p.tasks} members={p.teamMembers} onTaskStatusChange={handleTaskStatusChange} />
-          <ArtifactsCard checklist={submissionChecklist} />
+          <ArtifactsCard checklist={submissionChecklist} onUploadClick={(itemName) => setUploadDialogItem(itemName)} />
         </div>
       </div>
     </PageLayout>
+
+    {/* Upload Dialog Modal */}
+    {uploadDialogItem && (
+      <>
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(17, 24, 39, 0.38)',
+          backdropFilter: 'blur(2px)',
+          zIndex: 999,
+        }} onClick={() => setUploadDialogItem(null)} />
+        <div style={{
+          position: 'fixed', inset: 0,
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          padding: 24,
+          zIndex: 1000,
+        }}>
+          <SubmissionUploadDialog
+            itemName={uploadDialogItem}
+            projectId={projectId}
+            onClose={() => setUploadDialogItem(null)}
+          />
+        </div>
+      </>
+    )}
 
     {/* Delete Confirmation Modal */}
     {showDeleteModal && (

@@ -110,3 +110,24 @@ export interface UploadedDoc {
   uploadedAt: string;
   status: 'processing' | 'processed' | 'failed';
 }
+
+export interface UploadEvaluation {
+  verdict: 'Excellent' | 'Good' | 'Needs Work';
+  overallScore: number;
+  maxScore: number;
+  pct: number;
+  grade: string;
+  summary: string;
+  criteria: Array<{
+    criterionId: string;
+    criterion: string;
+    weight: number;
+    score: number;
+    maxScore: number;
+    status: 'covered' | 'partial' | 'missing';
+    feedback: string;
+    checkpoints: Array<{ passed: boolean; text: string }>;
+  }>;
+  strengths: string[];
+  suggestions: string[];
+}
