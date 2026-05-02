@@ -240,15 +240,38 @@ const priorityColor: Record<string, string> = {
 };
 
 /* ─── Section A: Rubric Tracker ─── */
-function RubricTracker({ rubric }: { rubric: RubricItem[] }) {
+function RubricTracker({ submissionReport }: { submissionReport?: Record<string, unknown> | null }) {
   const [showReadiness, setShowReadiness] = useState(false);
-  const totalScore = rubric.reduce((s, r) => s + r.score, 0);
-  const maxScore = rubric.reduce((s, r) => s + r.maxScore, 0);
+  const readinessData = (submissionReport as Record<string, unknown> | null) ?? null;
+  const readinessCoverage = Array.isArray(readinessData?.rubric_coverage)
+    ? (readinessData?.rubric_coverage as Record<string, unknown>[])
+    : [];
+
+  const displayRubric = readinessCoverage.length > 0
+    ? readinessCoverage.map((item, index) => ({
+        id: String(item.criterion_id ?? item.id ?? `rb${index + 1}`),
+        criterion: String(item.criterion_name ?? item.criterion ?? item.name ?? `Criterion ${index + 1}`),
+        weight: Number(item.weight_pct ?? item.weight ?? 0) > 1 ? Number(item.weight_pct ?? item.weight ?? 0) : Math.round(Number(item.weight_pct ?? item.weight ?? 0) * 100),
+        status: String(item.status ?? 'partial').toLowerCase() === 'complete'
+          ? 'covered'
+          : (['covered', 'partial', 'missing'].includes(String(item.status ?? 'partial').toLowerCase())
+            ? String(item.status ?? 'partial').toLowerCase()
+            : 'partial') as RubricItem['status'],
+        evidence: String(item.evidence ?? ''),
+        feedback: String(item.feedback ?? item.notes ?? ''),
+        score: Number(item.score ?? 0),
+        maxScore: Number(item.maxScore ?? item.max_score ?? 0) || Math.max(Number(item.score ?? 0), Number(item.weight_pct ?? item.weight ?? 0) > 1 ? Number(item.weight_pct ?? item.weight ?? 0) : Math.round(Number(item.weight_pct ?? item.weight ?? 0) * 100), 10),
+      }))
+    : [];
+
+  const hasReadinessCoverage = displayRubric.length > 0;
+  const totalScore = hasReadinessCoverage ? displayRubric.reduce((s, r) => s + r.score, 0) : 0;
+  const maxScore = hasReadinessCoverage ? displayRubric.reduce((s, r) => s + r.maxScore, 0) : 0;
   const pct = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
 
-  const partial = rubric.filter((r) => r.status === 'partial').length;
-  const missing = rubric.filter((r) => r.status === 'missing').length;
-  const goNogo = missing === 0 && partial <= 1 ? 'GO' : 'NO-GO';
+  const partial = hasReadinessCoverage ? displayRubric.filter((r) => r.status === 'partial').length : 0;
+  const missing = hasReadinessCoverage ? displayRubric.filter((r) => r.status === 'missing').length : 0;
+  const goNogo = hasReadinessCoverage ? (missing === 0 && partial <= 1 ? 'GO' : 'NO-GO') : 'WAITING';
 
   return (
     <div style={card}>
@@ -257,12 +280,18 @@ function RubricTracker({ rubric }: { rubric: RubricItem[] }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{
             fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 99,
-            background: goNogo === 'GO' ? '#dcfce7' : '#fee2e2',
-            color: goNogo === 'GO' ? '#166534' : '#991b1b',
+            background: goNogo === 'GO' ? '#dcfce7' : goNogo === 'WAITING' ? '#e5e7eb' : '#fee2e2',
+            color: goNogo === 'GO' ? '#166534' : goNogo === 'WAITING' ? '#374151' : '#991b1b',
           }}>{goNogo}</span>
           <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--grey-900)' }}>
-            {totalScore}<span style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 400 }}>/{maxScore}</span>
-            <span style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 500, marginLeft: 6 }}>({pct}%)</span>
+            {hasReadinessCoverage ? (
+              <>
+                {totalScore}<span style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 400 }}>/{maxScore}</span>
+                <span style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 500, marginLeft: 6 }}>({pct}%)</span>
+              </>
+            ) : (
+              <span style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 400 }}>Awaiting submission readiness output</span>
+            )}
           </span>
           <button
             onClick={() => setShowReadiness((o) => !o)}
@@ -281,42 +310,63 @@ function RubricTracker({ rubric }: { rubric: RubricItem[] }) {
         </div>
       </div>
 
-      <div style={{ display: 'flex', height: 10, borderRadius: 6, overflow: 'hidden', gap: 2, marginBottom: 8 }}>
-        {rubric.map((r) => {
-          const segColor = r.status === 'covered' ? '#274133' : r.status === 'partial' ? '#ce9042' : '#7D2027';
-          return (
-            <div
-              key={r.id}
-              title={`${r.criterion} — ${r.score}/${r.maxScore}`}
-              style={{ flex: r.weight, background: segColor, cursor: 'default' }}
-            />
-          );
-        })}
-      </div>
-
-      <div style={{ display: 'flex', gap: 16, marginBottom: 4 }}>
-        {rubric.map((r) => (
-          <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div style={{
-              width: 6, height: 6, borderRadius: 2, flexShrink: 0,
-              background: r.status === 'covered' ? '#274133' : r.status === 'partial' ? '#ce9042' : '#7D2027',
-            }} />
-            <span style={{ fontSize: 10, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
-              {r.criterion.split(' ').slice(0, 2).join(' ')} ({r.score}/{r.maxScore})
-            </span>
+      {hasReadinessCoverage ? (
+        <>
+          <div style={{ display: 'flex', height: 10, borderRadius: 6, overflow: 'hidden', gap: 2, marginBottom: 8 }}>
+            {displayRubric.map((r) => {
+              const segColor = r.status === 'covered' ? '#274133' : r.status === 'partial' ? '#ce9042' : '#7D2027';
+              return (
+                <div
+                  key={r.id}
+                  title={`${r.criterion} — ${r.score}/${r.maxScore}`}
+                  style={{ flex: r.weight, background: segColor, cursor: 'default' }}
+                />
+              );
+            })}
           </div>
-        ))}
-      </div>
+
+          <div style={{ display: 'flex', gap: 16, marginBottom: 4 }}>
+            {displayRubric.map((r) => (
+              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{
+                  width: 6, height: 6, borderRadius: 2, flexShrink: 0,
+                  background: r.status === 'covered' ? '#274133' : r.status === 'partial' ? '#ce9042' : '#7D2027',
+                }} />
+                <span style={{ fontSize: 10, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+                  {r.criterion.split(' ').slice(0, 2).join(' ')} ({r.score}/{r.maxScore})
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div style={{ marginBottom: 8, padding: '10px 12px', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 6, color: 'var(--text-3)', fontSize: 11 }}>
+          No rubric coverage returned yet from the submission readiness agent.
+        </div>
+      )}
 
       {showReadiness && (
         <div style={{ marginTop: 14 }}>
           <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-            {rubric.map((r, i) => {
+            {/* Submission readiness summary from agent */}
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--grey-100)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)' }}>Submission Readiness</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--grey-900)' }}>{String((submissionReport as any)?.readiness_score ?? (submissionReport as any)?.readinessScore ?? '-') } / 100</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 6, background: (String((submissionReport as any)?.recommendation ?? '') === 'ready_to_submit') ? '#dcfce7' : '#fff7ed', color: (String((submissionReport as any)?.recommendation ?? '') === 'ready_to_submit') ? '#166534' : '#92400e' }}>
+                  {String((submissionReport as any)?.recommendation ?? (submissionReport as any)?.result?.recommendation ?? '') || '—'}
+                </span>
+              </div>
+            </div>
+
+            {displayRubric.map((r, i) => {
               const isCovered = r.status === 'covered';
               const isPartial = r.status === 'partial';
               const circleColor = isCovered ? '#22c55e' : isPartial ? '#f59e0b' : '#d1d5db';
               return (
-                <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderBottom: i < rubric.length - 1 ? '1px solid var(--grey-100)' : 'none' }}>
+                <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderBottom: i < displayRubric.length - 1 ? '1px solid var(--grey-100)' : 'none' }}>
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0 }}>
                     <circle cx="9" cy="9" r="8" stroke={circleColor} strokeWidth="1.8" fill={isCovered ? circleColor : 'none'} />
                     {isCovered && <polyline points="5,9 8,12 13,6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />}
@@ -327,11 +377,33 @@ function RubricTracker({ rubric }: { rubric: RubricItem[] }) {
                       {r.criterion} <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>({r.weight}%)</span>
                     </p>
                     <p style={{ fontSize: 10, color: 'var(--text-3)', lineHeight: 1.35 }}>{r.evidence}</p>
+                    {r.feedback && <p style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 6 }}>Feedback: {r.feedback}</p>}
                   </div>
                   <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--grey-700)', flexShrink: 0 }}>{r.score}/{r.maxScore}</span>
                 </div>
               );
             })}
+
+            {/* Missing artefacts and last-minute risks */}
+            <div style={{ padding: 12, borderTop: '1px solid var(--grey-100)' }}>
+              {Array.isArray((submissionReport as any)?.missing_artefacts) && (submissionReport as any).missing_artefacts.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)' }}>Missing Artefacts</div>
+                  <ul style={{ margin: '6px 0 0 18px', color: 'var(--text-3)', fontSize: 10 }}>
+                    {((submissionReport as any).missing_artefacts as string[]).map((m, idx) => <li key={idx}>{m}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              {Array.isArray((submissionReport as any)?.last_minute_risks) && (submissionReport as any).last_minute_risks.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)' }}>Last-minute Risks</div>
+                  <ul style={{ margin: '6px 0 0 18px', color: '#b45309', fontSize: 10 }}>
+                    {((submissionReport as any).last_minute_risks as string[]).map((rsk, idx) => <li key={idx}>{rsk}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1095,6 +1167,7 @@ export default function ProjectWorkspacePage() {
   const [rubric, setRubric] = useState<RubricItem[]>(MOCK_RUBRIC);
   const [risks, setRisks] = useState<RiskAlert[]>(MOCK_RISKS);
   const [submissionChecklist, setSubmissionChecklist] = useState<ChecklistItem[]>([]);
+  const [submissionReport, setSubmissionReport] = useState<Record<string, unknown> | null>(null);
   const [milestones, setMilestones] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(!isMockId);
   const [apiAvailable, setApiAvailable] = useState(true);
@@ -1201,14 +1274,29 @@ export default function ProjectWorkspacePage() {
           const mapped = mapProject(backendProject, backendTasks, backendMembers, completionPct, riskScore);
           setProject({ ...mapped, tasks: syncedTasks, teamMembers: glmMembers });
 
-          // Submission readiness
-          const submissionResult = workflowState.submission_report as Record<string, unknown>;
+          // Submission readiness: prefer workflow state, but fall back to live validation
+          const existingSubmission = workflowState.submission_report as Record<string, unknown>;
+          let submissionResult: Record<string, unknown> = existingSubmission;
+          const hasCoverage = Array.isArray(existingSubmission?.rubric_coverage) && existingSubmission.rubric_coverage.length > 0;
+
+          if (!hasCoverage) {
+            try {
+              const submissionResponse = await workflowApi.runSubmissionCheck(projectId, []);
+              submissionResult = (submissionResponse as { result?: Record<string, unknown> })?.result ?? (submissionResponse as Record<string, unknown>);
+            } catch {
+              submissionResult = existingSubmission;
+            }
+          }
+
           const mappedRubric = mapRubric(submissionResult);
           if (mappedRubric.length > 0) setRubric(mappedRubric);
           else {
             const fallback = extractRubric(submissionResult);
             if (fallback) setRubric(fallback);
           }
+
+          // keep raw submission report for UI panels
+          setSubmissionReport(submissionResult);
 
           const rawChecklist = submissionResult?.submission_checklist;
           if (Array.isArray(rawChecklist) && rawChecklist.length > 0) {
@@ -1292,7 +1380,7 @@ export default function ProjectWorkspacePage() {
         <AnalysisPanel state={workflowState} dataSource={dataSource} />
         <RiskDetailsPanel risks={risks} />
         <MilestonesTimeline milestones={milestones} />
-        <RubricTracker rubric={rubric} />
+        <RubricTracker submissionReport={submissionReport} />
         <GanttTimeline tasks={p.tasks} />
         <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr 2fr', gap: 14, alignItems: 'start' }}>
           <AccountabilityAndTasks project={p} />
