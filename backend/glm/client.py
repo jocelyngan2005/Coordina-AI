@@ -1,5 +1,5 @@
 """
-glm/client.py — Z.AI GLM API client with retry logic and streaming support.
+glm/client.py — Gemini API client with retry logic and streaming support.
 """
 
 import httpx
@@ -18,7 +18,7 @@ def _is_retryable_http_error(exc: Exception) -> bool:
 
 class GLMClient:
     """
-    Low-level async wrapper around Z.AI's GLM chat completions API.
+    Low-level async wrapper around Google's Gemini chat completions API.
     All agent reasoning flows through this client.
     """
 

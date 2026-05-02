@@ -44,7 +44,9 @@ class PlanningAgent(BaseAgent):
             - capacity_analysis: team capacity vs estimated work
             - risk_flags: list of planning-level warnings
         """
-        result = await self._reason(context)
+        # Planning produces large JSON with many tasks, milestones, and dependencies.
+        # Use 20000 tokens to avoid truncation from model max_tokens limit.
+        result = await self._reason(context, max_tokens=20000)
 
         # Validate and normalize task structure
         tasks = result.get("tasks", [])

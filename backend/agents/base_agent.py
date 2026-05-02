@@ -62,6 +62,7 @@ class BaseAgent(ABC):
         context: dict[str, Any],
         history: list[dict] | None = None,
         expect_json: bool = True,
+        max_tokens: int | None = None,
     ) -> dict[str, Any]:
         """Convenience wrapper around the reasoning engine."""
         return await reasoning_engine.reason(
@@ -69,4 +70,5 @@ class BaseAgent(ABC):
             context=context,
             conversation_history=history,
             expect_json=expect_json,
+            max_tokens=max_tokens,
         )

@@ -43,6 +43,7 @@ class ReasoningEngine:
         conversation_history: list[dict] | None = None,
         expect_json: bool = True,
         temperature: float = 0.3,
+        max_tokens: int | None = None,
     ) -> dict[str, Any] | str:
         """
         Core reasoning call.
@@ -53,6 +54,7 @@ class ReasoningEngine:
             conversation_history: Prior turns for multi-turn reasoning
             expect_json: If True, parse GLM output as JSON
             temperature: Sampling temperature
+            max_tokens: Max output tokens (default 10000); increase for large outputs like task lists
 
         Returns:
             Parsed dict (if expect_json) or raw string
@@ -78,6 +80,7 @@ class ReasoningEngine:
             messages=messages,
             system_prompt=system_prompt,
             temperature=temperature,
+            max_tokens=max_tokens or 10000,
         )
 
         if not expect_json:
@@ -97,13 +100,30 @@ class ReasoningEngine:
         if fence_match:
             cleaned = fence_match.group(1).strip()
 
+        # First, try to parse the cleaned text as JSON directly
         try:
             return json.loads(cleaned)
-        except json.JSONDecodeError as e:
-            logger.error(f"GLM JSON parse failed for prompt '{prompt_name}': {e}\nRaw: {raw[:300]}")
-            raise GLMReasoningError(
-                f"GLM returned non-JSON output for '{prompt_name}': {str(e)}"
-            )
+        except json.JSONDecodeError:
+            # Try to recover JSON embedded in surrounding text. This handles
+            # cases where the model returns an explanation or omits fences.
+            # Look for the first JSON object or array in the output.
+            json_match = re.search(r"(\{[\s\S]*\}|\[[\s\S]*\])", cleaned)
+            if json_match:
+                candidate = json_match.group(0).strip()
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError:
+                    logger.warning(
+                        f"GLM JSON recovery attempt failed for prompt '{prompt_name}'.\nCandidate start: {candidate[:200]!r}..."
+                    )
+
+        # If we get here, we couldn't parse any JSON. Log the raw output
+        logger.error(
+            f"GLM JSON parse failed for prompt '{prompt_name}': no valid JSON found. Raw (truncated): {raw[:1000]!r}"
+        )
+        raise GLMReasoningError(
+            f"GLM returned non-JSON output for '{prompt_name}': unable to parse model response as JSON."
+        )
 
     async def reason_stream(
         self,
