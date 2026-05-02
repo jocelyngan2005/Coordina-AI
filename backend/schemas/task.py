@@ -29,6 +29,7 @@ class TaskUpdate(BaseModel):
 class TaskResponse(BaseModel):
     id: str
     project_id: str
+    task_id: Optional[str]
     title: str
     description: Optional[str]
     status: TaskStatus

@@ -366,11 +366,26 @@ function AccountabilityAndTasks({ project }: { project: Project }) {
   const [activeTab, setActiveTab] = useState<Task['status']>('in_progress');
   const visibleTasks = tasks.filter((t) => t.status === activeTab);
 
-  const total = members.reduce((s, m) => s + m.contributionScore, 0) || 1;
+  const memberProgress = members.map((member) => {
+    const assignedTasks = tasks.filter((task) => task.assigneeId === member.id);
+    const completedTasks = assignedTasks.filter((task) => task.status === 'done').length;
+    const completionPct = assignedTasks.length > 0
+      ? Math.round((completedTasks / assignedTasks.length) * 100)
+      : member.contributionScore;
+
+    return {
+      ...member,
+      assignedTasks: assignedTasks.length,
+      completedTasks,
+      completionPct,
+    };
+  });
+
+  const total = memberProgress.reduce((s, m) => s + m.completionPct, 0) || 1;
   const colors = ['#542916', '#b79858', '#a13a1e', '#88b8ce', '#f1c166'];
   let cumulative = 0;
-  const slices = members.map((m, i) => {
-    const pct = m.contributionScore / total;
+  const slices = memberProgress.map((m, i) => {
+    const pct = m.completionPct / total;
     const startAngle = cumulative;
     cumulative += pct;
     return { ...m, pct, startAngle, color: colors[i % colors.length] };
@@ -415,9 +430,9 @@ function AccountabilityAndTasks({ project }: { project: Project }) {
                     {s.name.split(' ')[0]} <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>· {s.role}</span>
                   </span>
                   <div style={{ textAlign: 'right' }}>
-                    <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--grey-900)' }}>{s.contributionScore}%</p>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--grey-900)' }}>{s.completionPct}%</p>
                     <div style={{ width: 40, height: 3, background: 'var(--grey-150)', borderRadius: 2, marginTop: 2 }}>
-                      <div style={{ width: `${s.contributionScore}%`, height: '100%', background: s.color, borderRadius: 2 }} />
+                      <div style={{ width: `${s.completionPct}%`, height: '100%', background: s.color, borderRadius: 2 }} />
                     </div>
                   </div>
                 </div>
@@ -534,20 +549,38 @@ function ArtifactsCard({ checklist }: { checklist: ChecklistItem[] }) {
   );
 }
 
-/* ─── Section E: My Tasks ─── */
-const MY_MEMBER_ID = 'm1';
+/* ─── Section E: Team Tasks ─── */
 type TaskState = 'none' | 'in_progress' | 'done';
 
-function MyTasksCard({ tasks }: { tasks: Task[] }) {
-  const myTasks = tasks.filter((t) => t.assignedTo.includes(MY_MEMBER_ID));
+function MyTasksCard({ 
+  tasks, 
+  members,
+  onTaskStatusChange,
+}: { 
+  tasks: Task[]; 
+  members: import('../types').TeamMember[];
+  onTaskStatusChange?: (taskId: string, newStatus: Task['status']) => Promise<void>;
+}) {
+  const memberMap = Object.fromEntries(members.map((m) => [m.id, m]));
+  const [updating, setUpdating] = useState<string | null>(null);
 
   const [states, setStates] = useState<Map<string, TaskState>>(() => {
     const m = new Map<string, TaskState>();
-    myTasks.forEach((t) => { m.set(t.id, t.status === 'done' ? 'done' : 'none'); });
+    tasks.forEach((t) => { m.set(t.id, t.status === 'done' ? 'done' : 'none'); });
     return m;
   });
 
-  const cycle = (id: string) =>
+  useEffect(() => {
+    setStates((prev) => {
+      const next = new Map<string, TaskState>();
+      tasks.forEach((task) => {
+        next.set(task.id, task.status === 'done' ? 'done' : task.status === 'in_progress' ? 'in_progress' : 'none');
+      });
+      return next.size > 0 ? next : prev;
+    });
+  }, [tasks]);
+
+  const cycle = async (id: string) => {
     setStates((prev) => {
       const next = new Map(prev);
       const cur = next.get(id) ?? 'none';
@@ -555,24 +588,49 @@ function MyTasksCard({ tasks }: { tasks: Task[] }) {
       return next;
     });
 
+    // Update backend if callback provided
+    if (onTaskStatusChange) {
+      const task = tasks.find((t) => t.id === id);
+      if (task) {
+        const newStatus: Task['status'] = task.status === 'done' ? 'pending' : task.status === 'pending' ? 'in_progress' : 'done';
+        setUpdating(id);
+        try {
+          await onTaskStatusChange(id, newStatus);
+        } catch (err) {
+          console.error('Failed to update task:', err);
+          // Revert on error
+          setStates((prev) => {
+            const next = new Map(prev);
+            next.set(id, task.status === 'done' ? 'done' : 'none');
+            return next;
+          });
+        } finally {
+          setUpdating(null);
+        }
+      }
+    }
+  };
+
   const doneCount = [...states.values()].filter((s) => s === 'done').length;
-  const total = myTasks.length;
+  const total = tasks.length;
 
   return (
     <div style={card}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 0 }}>
-        <SectionTitle>My Tasks</SectionTitle>
+        <SectionTitle>Team Tasks</SectionTitle>
         <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', marginBottom: 12 }}>{doneCount}/{total} complete</span>
       </div>
       <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-        {myTasks.length === 0 && (
-          <p style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', padding: '24px 0' }}>No tasks assigned to you yet.</p>
+        {tasks.length === 0 && (
+          <p style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', padding: '24px 0' }}>No tasks assigned yet.</p>
         )}
-        {myTasks.map((task, i) => {
+        {tasks.map((task, i) => {
           const state = states.get(task.id) ?? 'none';
           const isDone = state === 'done';
           const isProgress = state === 'in_progress';
           const pColor = priorityColor[task.priority];
+          const assignedMember = task.assigneeId ? memberMap[task.assigneeId] : undefined;
+          const isUpdating = updating === task.id;
           return (
             <div
               key={task.id}
@@ -580,13 +638,16 @@ function MyTasksCard({ tasks }: { tasks: Task[] }) {
               style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '10px 14px',
-                borderBottom: i < myTasks.length - 1 ? '1px solid var(--grey-100)' : 'none',
-                cursor: 'pointer', transition: 'background 0.12s', background: 'transparent',
+                borderBottom: i < tasks.length - 1 ? '1px solid var(--grey-100)' : 'none',
+                cursor: isUpdating ? 'wait' : 'pointer', 
+                transition: 'background 0.12s', 
+                background: 'transparent',
+                opacity: isUpdating ? 0.6 : 1,
               }}
-              onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.background = 'var(--grey-50)')}
-              onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.background = 'transparent')}
+              onMouseEnter={(e) => !isUpdating && ((e.currentTarget as HTMLDivElement).style.background = 'var(--grey-50)')}
+              onMouseLeave={(e) => !isUpdating && ((e.currentTarget as HTMLDivElement).style.background = 'transparent')}
             >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0, transition: 'all 0.15s' }}>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0, transition: 'all 0.15s', opacity: isUpdating ? 0.5 : 1 }}>
                 <circle cx="9" cy="9" r="8"
                   stroke={isDone ? '#274133' : isProgress ? '#ce9042' : 'var(--grey-300)'}
                   strokeWidth="1.8" fill={isDone ? '#274133' : 'none'}
@@ -602,7 +663,13 @@ function MyTasksCard({ tasks }: { tasks: Task[] }) {
                   ))}
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                {assignedMember && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Avatar initials={assignedMember.initials} size={18} />
+                    <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{assignedMember.name.split(' ')[0]}</span>
+                  </div>
+                )}
                 <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{task.dueDate.slice(5)}</span>
                 <div style={{ width: 7, height: 7, borderRadius: '50%', background: pColor }} title={task.priority} />
               </div>
@@ -927,6 +994,28 @@ export default function ProjectWorkspacePage() {
   const [workflowState, setWorkflowState] = useState<Record<string, unknown> | null>(null);
   const [dataSource, setDataSource] = useState<'glm' | 'mock'>('mock');
 
+  // Handle task status changes and update backend + local state
+  const handleTaskStatusChange = async (taskId: string, newStatus: Task['status']) => {
+    if (!project) return;
+
+    // Map Task status to BackendTask status (pending → backlog for backend compatibility)
+    const backendStatus = (newStatus === 'pending' ? 'backlog' : newStatus) as 'in_progress' | 'backlog' | 'done';
+
+    // Update backend
+    await tasksApi.update(taskId, { status: backendStatus });
+
+    // Update local state to reflect change
+    setProject((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        tasks: prev.tasks.map((t) =>
+          t.id === taskId ? { ...t, status: newStatus } : t
+        ),
+      };
+    });
+  };
+
   useEffect(() => {
     if (isMockId) {
       setProject(MOCK_PROJECT);
@@ -974,6 +1063,22 @@ export default function ProjectWorkspacePage() {
                 priority: t.priority, tags: [], description: t.description ?? '',
               } as import('../types').Task));
 
+          const backendTaskByKey = new Map(
+            backendTasks.map((task) => [task.task_id ?? task.id, task]),
+          );
+          const syncedTasks = glmTasks.map((task) => {
+            const backendTask = backendTaskByKey.get(task.id);
+            if (!backendTask) return task;
+            return {
+              ...task,
+              id: backendTask.id,  // ← Use backend UUID as frontend task ID for updates
+              status: backendTask.status,
+              assigneeId: backendTask.assignee_id ?? task.assigneeId,
+              assignedTo: backendTask.assignee_id ? [backendTask.assignee_id] : task.assignedTo,
+              dueDate: backendTask.due_date?.slice(0, 10) ?? task.dueDate,
+            };
+          });
+
           // Use GLM coordination members if available, fall back to DB members
           const roleAssignments = (workflowState.role_assignments ?? []) as Record<string, unknown>[];
           const contributionBalance = (workflowState.contribution_balance ?? []) as Record<string, unknown>[];
@@ -987,7 +1092,7 @@ export default function ProjectWorkspacePage() {
               }));
 
           const mapped = mapProject(backendProject, backendTasks, backendMembers, completionPct, riskScore);
-          setProject({ ...mapped, tasks: glmTasks, teamMembers: glmMembers });
+          setProject({ ...mapped, tasks: syncedTasks, teamMembers: glmMembers });
 
           // Submission readiness
           const submissionResult = workflowState.submission_report as Record<string, unknown>;
@@ -1084,7 +1189,7 @@ export default function ProjectWorkspacePage() {
         <GanttTimeline tasks={p.tasks} />
         <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr 2fr', gap: 14, alignItems: 'start' }}>
           <AccountabilityAndTasks project={p} />
-          <MyTasksCard tasks={p.tasks} />
+          <MyTasksCard tasks={p.tasks} members={p.teamMembers} onTaskStatusChange={handleTaskStatusChange} />
           <ArtifactsCard checklist={submissionChecklist} />
         </div>
       </div>

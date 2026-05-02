@@ -13,6 +13,7 @@ export interface BackendProject {
 export interface BackendTask {
   id: string;
   project_id: string;
+  task_id?: string | null;
   title: string;
   description: string | null;
   status: 'backlog' | 'in_progress' | 'done';
