@@ -25,7 +25,8 @@ class DocumentParser:
             return content.decode("utf-8", errors="replace")
         else:
             logger.warning(f"[DocumentParser] Unsupported MIME type: {mime_type}. Returning raw decode.")
-            return content.decode("utf-8", errors="replace")
+            # Strip null bytes (\x00) as they are not allowed in PostgreSQL text fields
+            return content.decode("utf-8", errors="replace").replace("\x00", "")
 
     def _extract_pdf(self, content: bytes) -> str:
         try:
