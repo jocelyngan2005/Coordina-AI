@@ -1,5 +1,7 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { projectsApi } from '../../api/projects';
+import type { BackendProject } from '../../api/types';
 
 /* ─── Icons (inline SVGs) ─── */
 const icons = {
@@ -140,7 +142,29 @@ const projectIcon = (
 
 export default function Navbar() {
   const [collapsed, setCollapsed] = useState(false);
+  const [projects, setProjects] = useState<BackendProject[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
   const location = useLocation();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProjects() {
+      try {
+        const data = await projectsApi.list();
+        if (!cancelled) {
+          setProjects(data);
+        }
+      } catch {
+        if (!cancelled) setProjects([]);
+      } finally {
+        if (!cancelled) setLoadingProjects(false);
+      }
+    }
+
+    void loadProjects();
+    return () => { cancelled = true; };
+  }, []);
 
   const sidebarStyle: React.CSSProperties = {
     width: collapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-w)',
@@ -153,30 +177,6 @@ export default function Navbar() {
     overflow: 'hidden',
     position: 'relative',
     zIndex: 10,
-  };
-
-  // The single persistent project entry
-  const PROJECT_ID = 'proj-001';
-  const PROJECT_NAME = 'Smart Campus Navigation';
-  const isProjectActive = location.pathname.startsWith(`/projects/${PROJECT_ID}`);
-
-  const projectEntryStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    padding: collapsed ? '9px 0' : '9px 12px',
-    justifyContent: collapsed ? 'center' : 'flex-start',
-    borderRadius: 'var(--radius-md)',
-    color: isProjectActive ? 'var(--white)' : 'var(--grey-600)',
-    background: isProjectActive ? 'var(--grey-900)' : 'transparent',
-    transition: 'all var(--t-fast)',
-    fontSize: 13,
-    fontWeight: 500,
-    cursor: 'pointer',
-    border: 'none',
-    width: '100%',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
   };
 
   return (
@@ -206,45 +206,64 @@ export default function Navbar() {
 
         <SectionLabel label="Projects" collapsed={collapsed} />
 
-        {/* Single persistent project link */}
-        <NavLink
-          to={`/projects/${PROJECT_ID}`}
-          end
-          title={collapsed ? PROJECT_NAME : undefined}
-          style={({ isActive }) => ({
-            ...projectEntryStyle,
-            background: isActive || isProjectActive ? 'var(--grey-900)' : 'transparent',
-            color: isActive || isProjectActive ? 'var(--white)' : 'var(--grey-600)',
-            textDecoration: 'none',
-          })}
-          onMouseEnter={e => {
-            if (!isProjectActive) {
-              (e.currentTarget as HTMLAnchorElement).style.background = 'var(--grey-100)';
-              (e.currentTarget as HTMLAnchorElement).style.color = 'var(--grey-900)';
-            }
-          }}
-          onMouseLeave={e => {
-            if (!isProjectActive) {
-              (e.currentTarget as HTMLAnchorElement).style.background = '';
-              (e.currentTarget as HTMLAnchorElement).style.color = 'var(--grey-600)';
-            }
-          }}
-        >
-          <span style={{ flexShrink: 0, display: 'flex' }}>{projectIcon}</span>
-          {!collapsed && (
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {PROJECT_NAME}
-              </span>
-              {/* Active dot */}
-              <div style={{
-                width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
-                background: '#22c55e',
-                boxShadow: '0 0 0 2px rgba(34,197,94,0.25)',
-              }} title="Active" />
-            </div>
-          )}
-        </NavLink>
+        {/* Project links */}
+        {!loadingProjects && projects.map((project) => {
+          const isProjectActive = location.pathname.startsWith(`/projects/${project.id}`);
+          return (
+            <NavLink
+              key={project.id}
+              to={`/projects/${project.id}`}
+              end
+              title={collapsed ? project.name : undefined}
+              style={({ isActive }) => ({
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: collapsed ? '9px 0' : '9px 12px',
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: 'pointer',
+                border: 'none',
+                width: '100%',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                background: isActive || isProjectActive ? 'var(--grey-900)' : 'transparent',
+                color: isActive || isProjectActive ? 'var(--white)' : 'var(--grey-600)',
+                textDecoration: 'none',
+                transition: 'all var(--t-fast)',
+              })}
+              onMouseEnter={e => {
+                if (!isProjectActive) {
+                  (e.currentTarget as HTMLAnchorElement).style.background = 'var(--grey-100)';
+                  (e.currentTarget as HTMLAnchorElement).style.color = 'var(--grey-900)';
+                }
+              }}
+              onMouseLeave={e => {
+                if (!isProjectActive) {
+                  (e.currentTarget as HTMLAnchorElement).style.background = '';
+                  (e.currentTarget as HTMLAnchorElement).style.color = 'var(--grey-600)';
+                }
+              }}
+            >
+              <span style={{ flexShrink: 0, display: 'flex' }}>{projectIcon}</span>
+              {!collapsed && (
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {project.name}
+                  </span>
+                  {/* Active dot */}
+                  <div style={{
+                    width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
+                    background: '#22c55e',
+                    boxShadow: '0 0 0 2px rgba(34,197,94,0.25)',
+                  }} title="Active" />
+                </div>
+              )}
+            </NavLink>
+          );
+        })}
 
         <NavLink
           to="/projects/new"
