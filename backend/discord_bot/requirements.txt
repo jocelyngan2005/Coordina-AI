@@ -1,0 +1,8 @@
+discord.py==2.3.2
+aiohttp==3.9.1
+python-dotenv==1.0.0
+sqlalchemy==2.0.23
+alembic==1.12.1
+asyncpg==0.29.0
+httpx==0.25.2
+APScheduler==3.10.4

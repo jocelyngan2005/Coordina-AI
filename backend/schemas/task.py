@@ -3,7 +3,7 @@
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
-from models.task import TaskStatus, TaskPriority
+from models.task import TaskStatus, TaskPriority, TaskPhase
 
 
 class TaskCreate(BaseModel):
@@ -34,10 +34,14 @@ class TaskResponse(BaseModel):
     description: Optional[str]
     status: TaskStatus
     priority: TaskPriority
+    phase: Optional[TaskPhase] = None
+    assigned_to: list = []
     assignee_id: Optional[str]
     estimated_hours: int
     completion_pct: int
+    start_date: Optional[datetime] = None
     due_date: Optional[datetime]
+    dependencies: list = []
     created_at: datetime
     updated_at: datetime
 
