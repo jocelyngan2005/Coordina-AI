@@ -2,6 +2,7 @@
 glm/client.py — Gemini API client with retry logic and streaming support.
 """
 
+import json
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 
@@ -29,6 +30,16 @@ class GLMClient:
         self.headers = {
             "Content-Type": "application/json",
         }
+        self._client = None
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=120.0, limits=httpx.Limits(max_connections=100, max_keepalive_connections=50))
+        return self._client
+
+    async def close(self):
+        if self._client:
+            await self._client.aclose()
 
     def _is_openai_compatible(self) -> bool:
         return "/openai" in self.base_url.lower()
@@ -133,11 +144,22 @@ class GLMClient:
     ) -> str:
         """
         Send a chat request to the GLM model.
-        Returns the assistant's text response.
-        
-        Note: max_tokens set to 10000 for complex agents with large responses
-        (planning decomposes to 13+ tasks with detailed descriptions).
         """
+        if settings.MOCK_GLM:
+            logger.info("GLMClient: MOCK_GLM is enabled. Returning mock response.")
+            # Return a generic mock JSON that fits most agents
+            return json.dumps({
+                "status": "success",
+                "project_health": "on_track",
+                "deadline_failure_probability": 0.05,
+                "identified_risks": [],
+                "recovery_actions": [],
+                "confidence_score": 0.95,
+                "analysis": "Mock analysis for performance testing.",
+                "tasks": [],
+                "milestones": []
+            })
+
         payload = self._build_payload(
             messages=messages,
             system_prompt=system_prompt,
@@ -146,38 +168,37 @@ class GLMClient:
         )
 
         logger.debug(f"GLM request: model={self.model}, messages={len(messages) + (1 if system_prompt else 0)}")
-        logger.debug(f"GLM payload: {payload}")
+        
+        client = await self._get_client()
+        try:
+            response = await client.post(
+                self._build_request_url(),
+                headers=self.headers,
+                json=payload,
+                params={"key": self.api_key},
+            )
+            response.raise_for_status()
+            data = response.json()
+            logger.debug(f"GLM raw response: {data}")
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            try:
-                response = await client.post(
-                    self._build_request_url(),
-                    headers=self.headers,
-                    json=payload,
-                    params={"key": self.api_key},
-                )
-                response.raise_for_status()
-                data = response.json()
-                logger.debug(f"GLM raw response: {data}")
+            content = self._extract_content(data)
+            
+            # Handle None content
+            if content is None:
+                logger.error(f"GLM returned None content. Full response: {data}")
+                raise GLMReasoningError("GLM returned null content — check model settings or prompt")
+            
+            logger.debug(f"GLM response received: {len(content)} chars")
+            return content
 
-                content = self._extract_content(data)
-                
-                # Handle None content
-                if content is None:
-                    logger.error(f"GLM returned None content. Full response: {data}")
-                    raise GLMReasoningError("GLM returned null content — check model settings or prompt")
-                
-                logger.debug(f"GLM response received: {len(content)} chars")
-                return content
-
-            except httpx.HTTPStatusError as e:
-                logger.error(f"GLM API HTTP error: {e.response.status_code} — {e.response.text}")
-                raise GLMReasoningError(self._format_http_error(e)) from e
-            except GLMReasoningError:
-                raise
-            except Exception as e:
-                logger.error(f"GLM API unexpected error: {type(e).__name__}: {str(e)}")
-                raise GLMReasoningError(f"GLM call failed: {type(e).__name__}: {str(e)}") from e
+        except httpx.HTTPStatusError as e:
+            logger.error(f"GLM API HTTP error: {e.response.status_code} — {e.response.text}")
+            raise GLMReasoningError(self._format_http_error(e)) from e
+        except GLMReasoningError:
+            raise
+        except Exception as e:
+            logger.error(f"GLM API unexpected error: {type(e).__name__}: {str(e)}")
+            raise GLMReasoningError(f"GLM call failed: {type(e).__name__}: {str(e)}") from e
 
     async def chat_stream(
         self,
