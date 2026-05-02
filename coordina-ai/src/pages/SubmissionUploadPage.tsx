@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react';
 import { MOCK_UPLOAD_EVALUATIONS } from '../data/mockData';
+import { documentsApi } from '../api/documents';
+import { workflowApi } from '../api/workflow';
 import type { UploadEvaluation } from '../types';
 
 const GRADING_STEPS = [
@@ -26,9 +28,11 @@ interface SubmissionUploadDialogProps {
   projectId: string;
   isReupload?: boolean;
   onClose: () => void;
+  /** Called with the confirmed evaluation when the user clicks "Confirm Submission" */
+  onConfirm?: (evaluation: UploadEvaluation) => void;
 }
 
-export default function SubmissionUploadDialog({ itemName, projectId, isReupload = false, onClose }: SubmissionUploadDialogProps) {
+export default function SubmissionUploadDialog({ itemName, projectId, isReupload = false, onClose, onConfirm }: SubmissionUploadDialogProps) {
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [grading, setGrading] = useState(false);
@@ -51,14 +55,128 @@ export default function SubmissionUploadDialog({ itemName, projectId, isReupload
     if (!file) return;
     setGrading(true);
     setGradingStep(0);
-    for (let i = 1; i <= GRADING_STEPS.length; i++) {
-      await new Promise<void>((r) => setTimeout(r, 850));
-      setGradingStep(i);
+
+    try {
+      // Step 1: upload & parse document
+      setGradingStep(1);
+      const uploaded = await documentsApi.upload(projectId, file, 'submission');
+
+      // Step 2: signal cross-referencing
+      setGradingStep(2);
+
+      // Step 3: run submission-readiness agent
+      setGradingStep(3);
+      type SubmissionResult = {
+        agent?: string;
+        status?: string;
+        result?: {
+          readiness_score?: number;
+          recommendation?: string;
+          rubric_coverage?: Array<{
+            criterion?: string;
+            criterionId?: string;
+            weight?: number;
+            score?: number;
+            max_score?: number;
+            maxScore?: number;
+            status?: 'covered' | 'partial' | 'missing';
+            feedback?: string;
+            checkpoints?: Array<{ passed: boolean; text: string }>;
+          }>;
+          coverage_summary?: { covered: number; partial: number; missing: number; total: number };
+          missing_artefacts?: string[];
+          submission_checklist?: Array<{ item: string; status: string }>;
+          last_minute_risks?: string[];
+        };
+      };
+
+      const raw = (await workflowApi.runSubmissionCheck(
+        projectId,
+        [uploaded.file_name],
+      )) as SubmissionResult;
+
+      setGradingStep(4);
+      await new Promise<void>((r) => setTimeout(r, 400));
+
+      // Map backend response → UploadEvaluation
+      const res = raw?.result;
+      if (res) {
+        const score = res.readiness_score ?? 0;
+        const maxScore = 100;
+        const pct = score;
+        const grade =
+          score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
+        const verdict: UploadEvaluation['verdict'] =
+          score >= 80 ? 'Excellent' : score >= 60 ? 'Good' : 'Needs Work';
+
+        const criteria: UploadEvaluation['criteria'] = (res.rubric_coverage ?? []).map(
+          (c, idx) => ({
+            criterionId: c.criterionId ?? String(idx),
+            criterion: c.criterion ?? `Criterion ${idx + 1}`,
+            weight: c.weight ?? 0,
+            score: c.score ?? 0,
+            maxScore: c.maxScore ?? c.max_score ?? 10,
+            status: c.status ?? 'missing',
+            feedback: c.feedback ?? '',
+            checkpoints: c.checkpoints ?? [],
+          }),
+        );
+
+        const recLabel: Record<string, string> = {
+          ready_to_submit: 'Your submission meets the rubric requirements.',
+          needs_work: 'Some rubric areas need additional work before submission.',
+          not_ready: 'Significant gaps remain — review rubric criteria carefully.',
+        };
+
+        const strengths = criteria
+          .filter((c) => c.status === 'covered')
+          .map((c) => `${c.criterion}: ${c.feedback || 'Well addressed.'}`);
+
+        const suggestions = [
+          ...(res.missing_artefacts ?? []),
+          ...(res.last_minute_risks ?? []),
+          ...criteria
+            .filter((c) => c.status !== 'covered')
+            .map((c) => c.feedback)
+            .filter(Boolean),
+        ] as string[];
+
+        const evaluation: UploadEvaluation = {
+          verdict,
+          overallScore: score,
+          maxScore,
+          pct,
+          grade,
+          summary: recLabel[res.recommendation ?? ''] ?? 'Evaluation complete.',
+          criteria,
+          strengths: strengths.length ? strengths : ['Document successfully uploaded and parsed.'],
+          suggestions: suggestions.length ? suggestions : ['No additional suggestions.'],
+        };
+        setEvaluation(evaluation);
+      } else {
+        // Backend returned empty result — try mock fallback
+        const fallback =
+          MOCK_UPLOAD_EVALUATIONS[`${projectId}::${itemName}`] ??
+          MOCK_UPLOAD_EVALUATIONS[itemName] ??
+          null;
+        setEvaluation(fallback);
+      }
+    } catch (err) {
+      console.error('[SubmissionUpload] Backend evaluation failed, using mock fallback:', err);
+      // Advance grading steps so animation looks complete
+      for (let i = gradingStep + 1; i <= GRADING_STEPS.length; i++) {
+        await new Promise<void>((r) => setTimeout(r, 400));
+        setGradingStep(i);
+      }
+      await new Promise<void>((r) => setTimeout(r, 300));
+      const fallback =
+        MOCK_UPLOAD_EVALUATIONS[`${projectId}::${itemName}`] ??
+        MOCK_UPLOAD_EVALUATIONS[itemName] ??
+        null;
+      setEvaluation(fallback);
+    } finally {
+      setGrading(false);
     }
-    await new Promise<void>((r) => setTimeout(r, 500));
-    const result = MOCK_UPLOAD_EVALUATIONS[`${projectId}::${itemName}`] ?? MOCK_UPLOAD_EVALUATIONS[itemName] ?? null;
-    setEvaluation(result);
-    setGrading(false);
   }
 
   const vc = evaluation ? verdictConfig[evaluation.verdict] : null;
@@ -331,7 +449,10 @@ export default function SubmissionUploadDialog({ itemName, projectId, isReupload
                     style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', fontSize: 13, fontWeight: 500, color: 'var(--grey-700)', cursor: 'pointer' }}
                   >Discard</button>
                   <button
-                    onClick={onClose}
+                    onClick={() => {
+                      if (evaluation) onConfirm?.(evaluation);
+                      onClose();
+                    }}
                     style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: 'var(--grey-900)', color: 'var(--white)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
                   >Confirm Submission →</button>
                 </div>

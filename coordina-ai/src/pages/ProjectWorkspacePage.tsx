@@ -1156,6 +1156,41 @@ export default function ProjectWorkspacePage() {
     }
   };
 
+  // Called by SubmissionUploadDialog when the user clicks "Confirm Submission"
+  const handleSubmissionConfirm = (ev: import('../types').UploadEvaluation) => {
+    // Convert UploadEvaluation → the submissionReport shape that RubricTracker reads
+    const rubricCoverage = ev.criteria.map((c) => ({
+      criterion_id: c.criterionId,
+      criterion: c.criterion,
+      weight_pct: c.weight,
+      score: c.score,
+      max_score: c.maxScore,
+      maxScore: c.maxScore,
+      status: c.status,
+      feedback: c.feedback,
+      evidence: c.feedback,
+    }));
+    const readinessScore = ev.overallScore;
+    const recommendation =
+      readinessScore >= 85
+        ? 'ready_to_submit'
+        : readinessScore >= 60
+        ? 'needs_work'
+        : 'not_ready';
+
+    setSubmissionReport({
+      rubric_coverage: rubricCoverage,
+      readiness_score: readinessScore,
+      recommendation,
+      missing_artefacts: ev.suggestions.filter((s) =>
+        !ev.criteria.some((c) => c.feedback === s)
+      ),
+      last_minute_risks: [],
+    });
+    // Close the upload dialog
+    setUploadDialogItem(null);
+  };
+
   const handleDeleteProject = async () => {
     if (!project || isMockId) return;
     setIsDeleting(true);
@@ -1481,6 +1516,7 @@ export default function ProjectWorkspacePage() {
             itemName={uploadDialogItem}
             projectId={projectId}
             onClose={() => setUploadDialogItem(null)}
+            onConfirm={handleSubmissionConfirm}
           />
         </div>
       </>
