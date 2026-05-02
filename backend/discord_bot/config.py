@@ -1,9 +1,11 @@
 """Discord bot configuration"""
 
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+# Explicitly load the backend .env (one level up from discord_bot/)
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env")
 
 # Discord bot settings
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -12,8 +14,8 @@ DISCORD_PREFIX = os.getenv("DISCORD_PREFIX", "!")
 # API settings
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
-# Database settings
-DB_URL = os.getenv("DB_URL", "postgresql+asyncpg://user:password@localhost/coordina_ai")
+# Database settings — use DATABASE_URL to match backend/.env key
+DB_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:password@localhost/coordina_ai")
 
 # Timezone for scheduling
 TIMEZONE = os.getenv("TIMEZONE", "UTC")
