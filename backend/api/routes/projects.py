@@ -28,15 +28,33 @@ async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_
 
 @router.get("/", response_model=list[ProjectResponse])
 async def list_projects(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Project).order_by(Project.created_at.desc()))
-    return result.scalars().all()
+    stmt = select(Project).options(selectinload(Project.members)).order_by(Project.created_at.desc())
+    result = await db.execute(stmt)
+    projects = result.scalars().all()
+    
+    for project in projects:
+        if project.team_size is None:
+            project.team_size = len(project.members)
+            
+    return projects
 
+
+from sqlalchemy.orm import selectinload
 
 @router.get("/{project_id}", response_model=ProjectResponse)
 async def get_project(project_id: str, db: AsyncSession = Depends(get_db)):
-    project = await db.get(Project, project_id)
+    # Use select with selectinload to get members for team_size calculation
+    stmt = select(Project).where(Project.id == project_id).options(selectinload(Project.members))
+    result = await db.execute(stmt)
+    project = result.scalar_one_or_none()
+    
     if not project:
         raise not_found(f"Project '{project_id}' not found.")
+    
+    # If team_size is not set in DB, use the count of members
+    if project.team_size is None:
+        project.team_size = len(project.members)
+        
     return project
 
 

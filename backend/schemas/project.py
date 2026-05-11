@@ -24,6 +24,8 @@ class ProjectResponse(BaseModel):
     name: str
     description: Optional[str]
     status: ProjectStatus
+    workflow_stage: str
+    team_size: Optional[int]
     deadline_date: Optional[datetime]
     created_at: datetime
     updated_at: datetime

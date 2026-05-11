@@ -92,19 +92,20 @@ function AccountabilityMatrix({ members, tasks }: { members: BackendMember[]; ta
     const done     = assigned.filter(t => t.status === 'done').length;
     const completionPct = assigned.length > 0
       ? Math.round((done / assigned.length) * 100)
-      : member.contribution_score; // fallback to backend score
+      : Math.round(member.contribution_score * (member.contribution_score <= 1 ? 100 : 1)); // fallback to backend score
     return { ...member, assigned: assigned.length, done, completionPct };
   });
 
-  const total = memberProgress.reduce((s, m) => s + m.completionPct, 0) || 1;
-  const avgScore = members.length > 0
-    ? Math.round(members.reduce((s, m) => s + m.contribution_score, 0) / members.length)
+  const totalCompletion = memberProgress.reduce((s, m) => s + m.completionPct, 0);
+  const total = totalCompletion || members.length || 1;
+  const avgScore = memberProgress.length > 0
+    ? Math.round(totalCompletion / memberProgress.length)
     : 0;
 
   /* Build pie slices */
   let cumulative = 0;
   const slices = memberProgress.map((m, i) => {
-    const pct = m.completionPct / total;
+    const pct = totalCompletion === 0 ? (1 / members.length) : (m.completionPct / total);
     const start = cumulative;
     cumulative += pct;
     return { ...m, pct, startAngle: start, color: PIE_COLORS[i % PIE_COLORS.length] };

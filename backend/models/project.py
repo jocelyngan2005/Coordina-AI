@@ -45,6 +45,13 @@ class Project(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+    
+    @property
+    def calculated_team_size(self) -> int:
+        """Returns the stored team_size or the count of currently joined members."""
+        if self.team_size is not None:
+            return self.team_size
+        return len(self.members)
 
     # Relationships
     members: Mapped[list["Member"]] = relationship(back_populates="project", cascade="all, delete-orphan")

@@ -642,11 +642,12 @@ function AccountabilityAndTasks({ project }: { project: Project }) {
     };
   });
 
-  const total = memberProgress.reduce((s, m) => s + m.completionPct, 0) || 1;
+  const totalCompletion = memberProgress.reduce((s, m) => s + m.completionPct, 0);
+  const total = totalCompletion || members.length || 1;
   const colors = ['#542916', '#b79858', '#a13a1e', '#88b8ce', '#f1c166'];
   let cumulative = 0;
   const slices = memberProgress.map((m, i) => {
-    const pct = m.completionPct / total;
+    const pct = totalCompletion === 0 ? (1 / members.length) : (m.completionPct / total);
     const startAngle = cumulative;
     cumulative += pct;
     return { ...m, pct, startAngle, color: colors[i % colors.length] };
@@ -680,7 +681,7 @@ function AccountabilityAndTasks({ project }: { project: Project }) {
               <circle cx="60" cy="60" r="26" fill="white" />
               <text x="60" y="55" textAnchor="middle" fontSize="9" fill="var(--grey-500)">Score</text>
               <text x="60" y="68" textAnchor="middle" fontSize="12" fontWeight="700" fill="var(--grey-900)">
-                {members.length > 0 ? Math.round(members.reduce((s, m) => s + m.contributionScore, 0) / members.length) : 0}%
+                {memberProgress.length > 0 ? Math.round(memberProgress.reduce((s, m) => s + m.completionPct, 0) / memberProgress.length) : 0}%
               </text>
             </svg>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
@@ -1274,7 +1275,7 @@ export default function ProjectWorkspacePage() {
             : backendMembers.map((m) => ({
                 id: m.id, name: m.name, role: m.skills[0] ?? 'Member',
                 initials: m.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2),
-                contributionScore: Math.round(m.contribution_score),
+                contributionScore: Math.round(m.contribution_score * 100),
                 lastActive: 'Recently', taskCount: 0,
               }));
 
